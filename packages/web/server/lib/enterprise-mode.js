@@ -14,6 +14,9 @@ import { z } from 'zod';
  *   which includes the login-shell snapshot. Meant for servers and containers,
  *   where the administrator owns the environment.
  * Read at every use, so a changed file applies without a restart.
+ * - DeepSeek Harness is a separate execution provider. Its discovery, session
+ *   creation, prompts and approval replies are refused in enterprise mode
+ *   (`deepseek/routes.js`); existing transcripts remain readable.
  *
  * The policy file also pins the self-hosted relay and the Jev endpoint, and
  * can allow network access. Who decides those follows who turned the mode on:

@@ -1,6 +1,7 @@
 export const createGracefulShutdownRuntime = (dependencies) => {
   const {
     process,
+    stopDeepSeek = () => {},
     shutdownTimeoutMs,
     getExitOnShutdown,
     getIsShuttingDown,
@@ -84,6 +85,7 @@ export const createGracefulShutdownRuntime = (dependencies) => {
     // Both embedded stop() and daemon exits use this sequence. Close admission
     // synchronously above, then stop viewers before draining their services.
     const cleanupOperations = [
+      stopDeepSeek,
       () => clearInterval(getRelayReconcileTimer()),
       () => getGuestSurfaceRuntime()?.stop(),
       () => getRealtimeProxyRuntime()?.stop(),

@@ -1,3 +1,4 @@
+import { decorateDeepSeekSession } from '../deepseek/wire.js';
 import http from 'node:http';
 import https from 'node:https';
 
@@ -414,6 +415,7 @@ export const registerOpenCodeProxy = (app, deps) => {
     // The folder trust check (`../opencode-trust`): requests for a folder
     // whose configuration runs code wait for the user's trust.
     openCodeTrust = null,
+    registerBackendRoutes = () => {},
   } = deps;
 
   /**
@@ -493,7 +495,7 @@ export const registerOpenCodeProxy = (app, deps) => {
     if (archived) result = withArchivedAt(result, archived);
     if (stored) result = withStoredMetadata(result, stored);
     if (unreadSince !== null) result = withUnreadBaseline(result, unreadSince);
-    return result;
+    return decorateDeepSeekSession(result);
   };
 
   const readOwnedState = async () => {
@@ -511,7 +513,6 @@ export const registerOpenCodeProxy = (app, deps) => {
     const records = sessionListRecords(payload);
     if (!records) return payload;
     const owned = await readOwnedState();
-    if (!hasOwnedState(owned)) return payload;
     const overlaid = records.map((session) => overlaySession(session, owned));
     return Array.isArray(payload) ? overlaid : { ...payload, data: overlaid };
   };
@@ -1186,6 +1187,8 @@ export const registerOpenCodeProxy = (app, deps) => {
       }
     });
   }
+
+  registerBackendRoutes(app);
 
   // V2 lists sessions across directories on every platform and owns pagination.
   app.get('/api/session', (req, res, next) => {

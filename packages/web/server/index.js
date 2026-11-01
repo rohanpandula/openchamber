@@ -1,3 +1,4 @@
+import { createDeepSeekIntegration } from './lib/deepseek/routes.js';
 import { installOpenCodeV2, supportsOpenCodeV2Install } from './lib/opencode/v2-install.js';
 import { describeOpenCodeCompatibility, readOpenCodeCliVersion, readExternalOpenCodeVersion } from './lib/opencode/compatibility.js';
 import 'reflect-metadata';
@@ -1233,6 +1234,13 @@ const globalMessageStreamHub = createGlobalMessageStreamHub({
   deltaCoalesceWindowMs: resolveDeltaCoalesceWindowMs(),
 });
 
+const deepSeekIntegration = createDeepSeekIntegration({
+  dataDir: OPENCHAMBER_DATA_DIR,
+  buildOpenCodeUrl,
+  getOpenCodeAuthHeaders,
+  publish: (event) => globalMessageStreamHub.injectEvent(event),
+});
+
 // Jev model routing and the permission safety net. Every failure keeps the
 // user's own model or the auto-accept reply it was asked about.
 const routingRuntime = createRoutingRuntime({
@@ -1524,6 +1532,7 @@ const processForwardedServerEvent = (payload, emitSyntheticEvent, spaceId = null
 
 
 const serverUtilsRuntime = createServerUtilsRuntime({
+  registerBackendRoutes: (app) => deepSeekIntegration.register(app),
   // Read lazily: the archive store is created with the session service further
   // down, while the proxy is registered later still.
   getArchivedSessions: () => openChamberSessionService.archiveStore.getAll(),
@@ -2222,6 +2231,7 @@ const waitForPortRelease = (...args) => openCodeLifecycleRuntime.waitForPortRele
 
 const setupProxy = (...args) => serverUtilsRuntime.setupProxy(...args);
 const gracefulShutdownRuntime = createGracefulShutdownRuntime({
+  stopDeepSeek: () => deepSeekIntegration.stop(),
   process,
   shutdownTimeoutMs: SHUTDOWN_TIMEOUT,
   getExitOnShutdown: () => exitOnShutdown,
