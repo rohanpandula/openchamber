@@ -1,173 +1,251 @@
-# <picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/badges/openchamber-logo-dark.svg"><img src="docs/references/badges/openchamber-logo-light.svg" width="32" height="32" align="absmiddle" /></picture> OpenChamber
+# OpenChamber DSH
 
-[![GitHub stars](https://img.shields.io/github/stars/openchamber/openchamber?style=flat&labelColor=100F0F&color=66800B)](https://github.com/openchamber/openchamber/stargazers)
-[![GitHub release](https://img.shields.io/github/v/release/openchamber/openchamber?style=flat&labelColor=100F0F&color=205EA6)](https://github.com/openchamber/openchamber/releases/latest)
-[![Discord](https://img.shields.io/badge/Discord-join.svg?style=flat&labelColor=100F0F&color=8B7EC8&logo=discord&logoColor=FFFCF0)](https://discord.gg/ZYRSdnwwKA)
-[![Support the project](https://img.shields.io/badge/Support-Project-black?style=flat&labelColor=100F0F&color=EC8B49&logo=patreon&logoColor=FFFCF0)](https://www.patreon.com/openchamber)
+**A desktop and browser workspace for AI coding agents, with DeepSeek Harness support.**
 
-<a href="https://www.blacksmith.sh/"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/badges/blacksmith-dark.svg"><img src="docs/references/badges/blacksmith-light.svg" height="28" alt="CI powered by Blacksmith" /></picture></a>
+Describe a task, watch the agent work, review its file changes, and approve commands from one place. OpenChamber keeps the conversation, code diffs, terminal, and project files together so you can see what the agent did before you keep the result.
 
-## Run agent work. Keep control. Ship from anywhere.
+This repository is a fork of [OpenChamber](https://github.com/openchamber/openchamber). It adds a connection to **DeepSeek Harness**, the local agent runtime launched by the `dsh` command. DeepSeek conversations run through your own Harness installation and its configured model provider.
 
-**OpenChamber is an open-source workspace for running and reviewing AI coding work on desktop, web, VS Code, and mobile.**
+[Get started](#get-started) · [Configure DeepSeek](#configure-deepseek) · [Update safely](#updates) · [Troubleshooting](#troubleshooting) · [Contribute](#development-and-contributing)
 
-Start agent work, see what changed, and take it through review and release. Your projects and sessions remain available when you switch devices or step away.
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/references/desktop_dark.png">
+  <img src="docs/references/desktop_light.png" alt="OpenChamber workspace showing an agent conversation, project navigation, and development tools">
+</picture>
 
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/desktop_dark.png"><img src="docs/references/desktop_light.png" alt="OpenChamber desktop app"></picture>
+*The OpenChamber interface. This fork adds DeepSeek Harness to the model picker.*
 
-<details>
-<summary>More screenshots</summary>
+## What it does
 
-![VS Code Extension](packages/vscode/extension.jpg)
+- **Work with an agent in a project.** Send a task, follow the response as it streams, and continue the same conversation later.
+- **Review the work.** Inspect file changes and use the built-in terminal and browser to check the result.
+- **Control tool execution.** See permission requests and approve or reject them from the conversation.
+- **Keep projects organized.** Find previous sessions, group them into folders, and return to saved work.
+- **Choose a backend.** Use the DeepSeek Harness integration or the regular OpenCode-backed sessions provided by OpenChamber.
 
-<p>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/mobile/new_session_dark.png"><img src="docs/references/mobile/new_session_light.png" width="30%" alt="OpenChamber mobile new session"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/mobile/chat_dark.png"><img src="docs/references/mobile/chat_light.png" width="30%" alt="OpenChamber mobile chat"></picture>
-<picture><source media="(prefers-color-scheme: dark)" srcset="docs/references/mobile/context_usage_dark.png"><img src="docs/references/mobile/context_usage_light.png" width="30%" alt="OpenChamber mobile context and usage"></picture>
-</p>
+OpenChamber is the interface. The agent runtime executes tools and talks to the model provider. A model account, credentials, and any inference charges belong to that provider; installing this app does not include model access.
 
-</details>
+### How the pieces fit
 
-## What you can do with OpenChamber
-
-### Goals that continue on their own
-
-Give a session a finish line with **Session Goals**. OpenChamber checks the result after every turn and keeps the agent working until it completes the goal, gets blocked, or reaches the limit you set. It can continue after you close the app.
-
-### Compare and combine runs
-
-Use **Multi-run** to give the same task to up to five models, each in its own session and optionally its own worktree. See what each one actually built, choose the best result, or use **Fusion** to combine the strongest parts into a new session.
-
-### Guided changes walkthroughs
-
-**Changes Walkthrough** turns a large diff into an AI-guided tour of the change. It groups related edits into steps, puts them in the order the change makes sense, and explains how the pieces fit together.
-
-### Inspect a running app
-
-Open your app beside the conversation with **Preview**. Point at an element to send the agent its screenshot, styles, position, and browser errors. No more trying to explain "this thing here." The desktop app can do the same with any web page in its built-in browser.
-
-### GitHub context from issue to pull request
-
-Start a session from a GitHub issue or pull request with its context attached. Send failed checks or review comments back to the agent, then update or merge the pull request from OpenChamber.
-
-### Continue on another device
-
-Open the same projects and sessions from Desktop, Web/PWA, VS Code, iOS, or Android. Check progress, answer questions, review changes, and reattach to a running terminal.
-
-### Private remote access
-
-Pair a device with a one-time QR code and connect through **Private Relay** without opening ports or exposing a public server. The connection is end-to-end encrypted and can be revoked at any time. Direct connections, LAN/VPN access, Cloudflare/Ngrok tunnels, and SSH are also supported.
-
-### Track work across projects
-
-See which sessions are working, waiting, finished, or failed, along with approvals, scheduled tasks, provider limits, token use, and costs. Organize sessions into folders and keep notes, todos, and reusable project actions nearby.
-
-### Schedule recurring work
-
-Run a prompt once, daily, weekly, or on a cron schedule. Scheduled tasks can use Session Goals, so they continue toward an outcome instead of stopping after one response.
-
-## Use it where you work
-
-| Surface | Role |
+| Component | Purpose |
 | --- | --- |
-| **Desktop** | The complete workspace for macOS, Windows, and Linux, with multiple windows, Mini Chat, remote machines, SSH, and native notifications |
-| **Web / PWA** | Open your workspace in a browser, install it as an app, and stay up to date through background notifications |
-| **VS Code** | Keep sessions beside your code, send selections to the agent, open results in the editor, and compare parallel runs |
-| **iOS / Android** | Review and steer work away from your desk, receive completion alerts, and use the terminal with touch controls |
-| **CLI / Server** | Run OpenChamber on a workstation or server, schedule work, manage remote access, and keep it available after login |
+| **OpenChamber DSH** | The app you use to chat, inspect changes, and answer permission requests |
+| **DeepSeek Harness / `dsh`** | The separately installed agent runtime for DeepSeek sessions |
+| **Model provider** | The service configured in Harness that runs the model |
+| **OpenCode** | The bundled desktop runtime for regular sessions and the shared project/session index |
 
-## Quick start
+The DeepSeek adapter uses ACP, a protocol for connecting an editor or app to an agent. You do not need to work with the protocol to use the app.
 
-### Desktop for macOS, Windows, and Linux
+## Get started
 
-Download the latest release from [GitHub Releases](https://github.com/openchamber/openchamber/releases/latest). Desktop bundles the matching OpenCode CLI, so no separate OpenCode installation is required.
+### Install the macOS release
 
-Linux releases come for x86_64 and ARM64 as a `.deb` (Debian, Ubuntu), an `.rpm` (Fedora, openSUSE) and an AppImage. The packages install OpenChamber into the app menu, and in-app updates ask for your password to install the new package:
+Download the Apple Silicon macOS package from [this fork's Releases page](https://github.com/rohanpandula/openchamber/releases/latest), open the DMG, and drag **OpenChamber DSH** into Applications. Configure Harness using the [DeepSeek setup](#configure-deepseek), then open the app and select **DeepSeek Harness** in the model picker.
 
-```bash
-sudo apt install ./OpenChamber-*-linux-amd64.deb    # Debian, Ubuntu
-sudo dnf install ./OpenChamber-*-linux-x86_64.rpm   # Fedora
-```
+The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The first fork release is **2.5.4**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
 
-The AppImage needs no install. Make it executable and keep it in a writable location for in-app updates; on its first start it adds itself to the app menu:
+### Build from source
 
-```bash
-chmod +x OpenChamber-*.AppImage
-./OpenChamber-*.AppImage
-```
+#### Requirements
 
-Linux AppImages require FUSE (`libfuse.so.2`). Without FUSE, run with `APPIMAGE_EXTRACT_AND_RUN=1`.
+- **Node.js 24.14 or newer** and **Bun 1.4.4**, matching the repository's toolchain.
+- **Git** to clone and update the repository.
+- A working **[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness#readme)** installation with its `dsh` executable, a configured provider, and credentials.
+- For a macOS desktop build, **Xcode command-line tools** and an Apple Silicon or Intel Mac.
 
-### VS Code
+The DeepSeek desktop integration has been exercised on Apple Silicon macOS. OpenChamber also has Windows and Linux desktop packages, but this fork's DeepSeek setup has not been verified on those platforms. Desktop bundles OpenCode; a separately running web server needs its own compatible OpenCode CLI.
 
-Install [OpenChamber from the Visual Studio Marketplace](https://marketplace.visualstudio.com/items?itemName=fedaykindev.openchamber), or search for "OpenChamber" in Extensions.
-
-### CLI for Web and PWA
-
-Requires Node.js 24.14+. CLI/Web and VS Code use your installed [OpenCode CLI](https://opencode.ai).
+#### 1. Get the source
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/openchamber/openchamber/main/scripts/install.sh | bash
-openchamber --ui-password be-creative-here
+git clone https://github.com/rohanpandula/openchamber.git
+cd openchamber
+bun install --frozen-lockfile
 ```
 
-Common operations:
+#### 2. Configure DeepSeek
+
+Follow [Configure DeepSeek](#configure-deepseek) before opening your first DeepSeek session. Follow the [official Harness installation and authentication guide](https://github.com/deepseek-ai/deepseek-harness#readme). Confirm that Harness itself can use your chosen provider and model before troubleshooting the app.
+
+#### 3. Build the desktop app
+
+For a local Apple Silicon build, run these commands from the repository root:
 
 ```bash
-openchamber status
-openchamber connect-url --qr
-openchamber tunnel start --provider cloudflare --mode quick --qr
-openchamber startup enable
-openchamber logs
-openchamber stop
-openchamber update
+export BUN="$(command -v bun)"
+export CSC_IDENTITY_AUTO_DISCOVERY=false
+bun run --cwd packages/electron package \
+  --mac --arm64 --dir \
+  --config.mac.identity=null --config.mac.notarize=false
+
+codesign --force --deep --sign - \
+  --entitlements packages/electron/resources/entitlements.mac.plist \
+  "packages/electron/dist/mac-arm64/OpenChamber DSH.app"
+
+open "packages/electron/dist/mac-arm64/OpenChamber DSH.app"
 ```
 
-OpenChamber binds to localhost by default. Use `--lan` only on a trusted network and protect browser access with `--ui-password`.
+On an Intel Mac, use `--x64` and the output directory `packages/electron/dist/mac`. This builds a locally signed app, without Apple notarization. Release signing and platform packaging are covered in the [desktop README](packages/electron/README.md).
 
-## Guides
+To install it, quit any running copy and copy `OpenChamber DSH.app` into Applications. Keep the app's name and bundle identity when rebuilding so subsequent installs use the same saved configuration.
 
-Go deeper with the OpenChamber guides:
+### Start a conversation
 
-- [Quick start](packages/docs/content/docs/quickstart.mdx)
-- [Installation](packages/docs/content/docs/install.mdx)
-- [Connect devices](packages/docs/content/docs/connect-devices.mdx)
-- [Private Relay](packages/docs/content/docs/private-relay.mdx)
-- [Multi-run](packages/docs/content/docs/multi-run.mdx)
-- [Session Goals](packages/docs/content/docs/session-goals.mdx)
-- [Changes Walkthrough](packages/docs/content/docs/walkthrough.mdx)
-- [Preview and dev servers](packages/docs/content/docs/preview.mdx)
-- [GitHub workflows](packages/docs/content/docs/github.mdx)
-- [Mobile](packages/docs/content/docs/mobile.mdx)
-- [Security](packages/docs/content/docs/security.mdx)
-- [Troubleshooting](packages/docs/content/docs/troubleshooting.mdx)
+1. Open **OpenChamber DSH** and choose a project or start a new session.
+2. Open the model picker and choose the model under **DeepSeek Harness**.
+3. Send a small task, such as asking the agent to explain the project.
+4. Review tool requests and file changes before approving or keeping them.
 
-For self-hosting details, see the [reverse proxy guide](docs/REVERSE_PROXY.md). For custom theme authoring, see the [custom themes guide](docs/CUSTOM_THEMES.md).
+Existing OpenCode sessions keep their original backend. Start a new session to use DeepSeek.
 
-## Why OpenCode?
+## Configure DeepSeek
 
-OpenChamber uses [OpenCode](https://opencode.ai) to run coding agents. We chose it because it is open source, has a solid API, and is easy to extend.
+Desktop reads its connection settings from:
 
-OpenChamber handles the rest of the workflow. You can decide what to try, keep the agent on track, review the result, connect from another device, and ship the change.
+```text
+~/.config/openchamber-dsh-v2/deepseek.json
+```
 
-OpenChamber is an independent project and is not affiliated with the OpenCode team.
+Create that directory and file if they do not exist. The file contains connection settings, not API keys:
 
-## Contributing
+```json
+{
+  "binary": "/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh",
+  "args": "--profile acp",
+  "provider": "deepseek-official",
+  "model": "deepseek-v4-flash"
+}
+```
 
-Bug fixes are welcome as PRs that link their bug report. Features and behavior changes start as a [feature request](https://github.com/openchamber/openchamber/issues/new?template=feature_request.yml), and building starts once it is marked `accepted`. Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening a PR; it has the setup, the review contract, and what happens to a PR without a linked issue. Documentation authoring guidance lives in [`packages/docs`](packages/docs/README.md).
+These are example provider/model values. Use the identifiers from your working Harness configuration. If your provider needs a Harness patch, include it in `args`, for example `--profile acp --patch \"/absolute/path/to/provider.patch.yml\"`. Restart OpenChamber DSH after changing this file.
 
-Bugs go to [issues](https://github.com/openchamber/openchamber/issues/new/choose). Questions go to [Q&A discussions](https://github.com/openchamber/openchamber/discussions/categories/q-a).
+| Setting | What to put there |
+| --- | --- |
+| `binary` | The absolute path to your `dsh` executable |
+| `args` | Harness launch arguments, including the profile and optional patch file |
+| `provider` | The provider identifier configured in that Harness profile |
+| `model` | The model identifier available through that provider |
 
-## Acknowledgments
+Keep credentials in Harness's credential storage. The adapter starts your local `dsh` process and uses its existing authentication. It does not require copying API keys into this repository.
 
-Special thanks to:
+You can override these values with `DEEPSEEK_DSH_BIN`, `DEEPSEEK_DSH_ARGS`, `DEEPSEEK_PROVIDER`, and `DEEPSEEK_MODEL` in the app's launch environment. A missing configuration leaves DeepSeek unavailable unless those environment variables configure it. Invalid JSON or missing required fields prevents startup with a configuration error.
 
-- [OpenCode](https://opencode.ai) for the API and open-source architecture OpenChamber builds on
-- [Pierre](https://pierrejs-docs.vercel.app/) for the diff viewer and syntax highlighting
-- The [T3 Code](https://github.com/pingdotgg/t3code) team for their browser adapter for [libghostty-vt](https://github.com/ghostty-org/ghostty), which our terminal is built on
-- [Yulia Ivashko](https://github.com/yulia-ivashko), who built the firework celebration that plays on every successful push
-- Everyone who contributed code, reported bugs, or shared ideas
+### Browser development
 
-## License
+For a source development server, export the same connection settings in your shell. Desktop's `deepseek.json` file is specific to the desktop launcher.
 
-MIT
+```bash
+export DEEPSEEK_DSH_BIN="/absolute/path/to/dsh"
+export DEEPSEEK_DSH_ARGS="--profile acp"
+export DEEPSEEK_PROVIDER="your-provider-id"
+export DEEPSEEK_MODEL="your-model-id"
+bun run dev
+```
+
+Open the Vite URL printed by the command. The server runs on your machine; the browser is its interface. See [CONTRIBUTING.md](CONTRIBUTING.md) for development scripts and [the server package](packages/web/README.md) for server setup.
+
+## Supported DeepSeek features
+
+| Feature | Status |
+| --- | --- |
+| Text chat and streamed responses | Supported |
+| Reasoning and tool output | Supported when emitted by Harness |
+| Tool permissions and cancellation | Supported |
+| Saved conversations and restart recovery | Supported |
+| Image attachments | Passed to Harness; model support varies |
+| Multiple DeepSeek models in one configured app | One configured model at a time |
+| Token and cost accounting | Not reported; counters currently show zero |
+| OpenCode skill/agent attachments, shell turns, compaction, forks, session moves, backend switching | Not supported for DeepSeek sessions |
+| DeepSeek inside the VS Code extension | Not implemented |
+
+Harness can execute terminal tools within a DeepSeek conversation. The unsupported “shell turns” entry refers to OpenCode's separate shell-message API, not to those tool calls.
+
+OpenChamber's other features, including goals, multi-run, scheduling, and remote access, come from upstream. Their presence in the interface does not establish compatibility with the DeepSeek backend. See the [adapter documentation](packages/web/server/lib/deepseek/DOCUMENTATION.md) for its exact boundaries. Enterprise mode disables DeepSeek execution.
+
+## Updates
+
+**Keep using builds from this fork to keep the DeepSeek integration.**
+
+The desktop's Stable and Canary update channels point only to `rohanpandula/openchamber`. They do not fall back to official OpenChamber releases. The updater can install compatible packages published in this fork. Source builds can be updated directly:
+
+```bash
+git switch main
+git pull --ff-only origin main
+bun install --frozen-lockfile
+```
+
+Then repeat the desktop build and replace your installed copy after quitting it. Review or commit local changes before pulling.
+
+Saved conversations and connection settings live outside the app bundle:
+
+| Data | Default location on macOS |
+| --- | --- |
+| DeepSeek settings and transcripts | `~/.config/openchamber-dsh-v2/` |
+| Bundled OpenCode configuration and data | `runtime-config/` and `runtime-data/` inside that directory |
+| Desktop window and browser state | `~/Library/Application Support/OpenChamber DSH 2/` |
+| Harness credentials | Harness's own credential storage |
+
+Replacing the app preserves those directories. Back them up before a major upgrade. Installing an official upstream binary or running an official package-manager update cannot preserve code that exists only in this fork.
+
+### Bringing upstream changes into the fork
+
+Maintainers merge upstream changes into this repository and rebuild the fork. For an existing clone, add the upstream remote once:
+
+```bash
+git remote add upstream https://github.com/openchamber/openchamber.git
+```
+
+Then fetch and merge when ready:
+
+```bash
+git fetch upstream
+git switch main
+git merge upstream/main
+```
+
+Resolve any conflicts before building. Preserve the DeepSeek adapter, desktop startup configuration, fork app identity, and fork update feeds. Run the checks below and test a real DeepSeek conversation before publishing an update. Future upstream changes may require adapter work. The upstream npm/release automation is disabled in this fork; fork packages are built and published separately.
+
+## Troubleshooting
+
+| Problem | Check |
+| --- | --- |
+| No DeepSeek Harness model in the picker | Check `deepseek.json`, the `binary` path, and whether `dsh` runs; restart the app |
+| Model or authentication error | Run Harness directly with the same profile and patch; confirm the provider/model identifiers and credentials there |
+| App fails immediately after editing configuration | Validate the JSON and supply all four required fields |
+| Existing session uses another backend | Create a new session and select DeepSeek Harness before sending |
+| Update check has no release to install | Use the source-build update instructions until this fork publishes a compatible package |
+| Unsupported operation error | Check the DeepSeek feature table; the adapter refuses operations it cannot perform |
+
+Desktop logs are under `~/Library/Logs/OpenChamber DSH/` on macOS. Remove secrets and private prompts before sharing logs.
+
+For integration bugs, [open an issue in this fork](https://github.com/rohanpandula/openchamber/issues). Include the app version, OS, Harness version, and a minimal reproduction. General OpenChamber documentation is available at [openchamber.dev](https://openchamber.dev).
+
+## Development and contributing
+
+The code is organized as a monorepo:
+
+| Directory | Contains |
+| --- | --- |
+| `packages/ui` | Shared React interface and session state |
+| `packages/web` | Web app, server, and DeepSeek ACP adapter |
+| `packages/electron` | Desktop launcher, native integrations, and updater |
+| `packages/vscode` | VS Code extension |
+| `packages/mobile` | Native mobile shell |
+| `packages/sdk` | Extension SDK |
+| `packages/docs` | Product documentation |
+
+Run focused integration tests and the repository checks from the root:
+
+```bash
+bun run --cwd packages/web test server/lib/deepseek
+node --test packages/electron/deepseek-desktop.test.mjs packages/electron/updater-feed.test.mjs
+bun run check:changed
+```
+
+Keep fixes focused and include a reproduction or test for changed behavior. Read [AGENTS.md](AGENTS.md) and [CONTRIBUTING.md](CONTRIBUTING.md) before working on the code. The contribution guide contains upstream's review policies; discuss fork-specific changes in this repository.
+
+## Credits and license
+
+Maintained as a fork by [Rohan Pandula](https://github.com/rohanpandula). OpenChamber DSH builds on the work of the [OpenChamber contributors](https://github.com/openchamber/openchamber/graphs/contributors), [OpenCode](https://opencode.ai), and DeepSeek Harness. OpenChamber is independent of the OpenCode and DeepSeek teams.
+
+[MIT license](LICENSE).

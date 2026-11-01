@@ -2,7 +2,7 @@ import fs from 'node:fs';
 
 export const PRODUCTION_UPDATER_FEED = Object.freeze({
   provider: 'github',
-  owner: 'openchamber',
+  owner: 'rohanpandula',
   repo: 'openchamber',
 });
 
@@ -12,7 +12,7 @@ export const PRODUCTION_UPDATER_FEED = Object.freeze({
 // channel never sees them.
 export const CANARY_UPDATER_FEED = Object.freeze({
   provider: 'generic',
-  url: 'https://github.com/openchamber/openchamber/releases/download/canary/',
+  url: 'https://github.com/rohanpandula/openchamber/releases/download/canary/',
 });
 
 // Where the app takes its updates from: the releases, or the nightly Canary

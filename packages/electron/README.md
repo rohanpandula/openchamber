@@ -4,6 +4,37 @@ Electron desktop runtime for OpenChamber on macOS, Windows, and Linux.
 
 This package owns the native shell: windows, menus, deep links, native notifications, auto-updates, host switching, SSH connections, tunnel helpers, and packaged desktop builds. The web UI and OpenChamber server logic still live in `packages/web` and shared React UI lives in `packages/ui`.
 
+## DeepSeek fork identity and updates
+
+This fork packages `OpenChamber DSH` with app ID `dev.rohan.openchamber.dsh`
+and the standard `openchamber` link protocol. Both update channels and the packaged
+publisher point at `rohanpandula/openchamber`. Keep these together when merging
+upstream: an upstream binary does not contain this fork's ACP adapter.
+
+`deepseek-desktop.mjs` runs in packaged builds before the desktop profile and backend initialize.
+It reads `deepseek.json` from `OPENCHAMBER_DATA_DIR`, which defaults to
+`~/.config/openchamber-dsh-v2`. The file requires `binary`, `args`, `provider`
+and `model`; the corresponding `DEEPSEEK_*` environment values take priority.
+A missing file leaves DeepSeek disabled unless configured through the
+environment. A malformed file fails startup explicitly. Credentials stay in
+dsh's own storage. This configuration, native session data and transcripts
+live outside the app bundle and survive replacement builds.
+
+The Chromium profile remains `OpenChamber DSH 2` under the platform's app-data
+directory. On macOS, the managed OpenCode configuration and data default to
+`runtime-config` and `runtime-data` under the fork's data directory. Explicit
+path overrides remain supported. Injected variables use the shared environment
+registry so a CLI service started from the app's terminal does not adopt this
+profile accidentally. Relay hosting defaults to off.
+
+### Why updates use the fork's releases
+
+An official OpenChamber update would replace the executable that implements
+DeepSeek. Following the fork's releases preserves the integration while
+upstream changes enter through source merges and rebuilt fork packages.
+A compatible release must be published in the fork before automatic updates
+can deliver it; an empty feed cannot fall back to official packages.
+
 ## How It Runs
 
 Desktop starts the OpenChamber web server in the same Electron main process. There is no separate sidecar subprocess for the OpenChamber server.

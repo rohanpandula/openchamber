@@ -29,6 +29,7 @@ env:
 
 jobs:
   prepare:
+    if: github.repository == 'openchamber/openchamber'
     runs-on: ubuntu-latest
     outputs:
       build: ${{ steps.decide.outputs.build }}

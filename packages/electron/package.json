@@ -1,6 +1,6 @@
 {
   "name": "@openchamber/electron",
-  "version": "2.5.3",
+  "version": "2.5.4",
   "private": true,
   "description": "Electron desktop runtime for OpenChamber",
   "author": "OpenChamber",
@@ -58,8 +58,8 @@
     "lint": "node -e \"process.exit(0)\""
   },
   "build": {
-    "appId": "dev.openchamber.desktop",
-    "productName": "OpenChamber",
+    "appId": "dev.rohan.openchamber.dsh",
+    "productName": "OpenChamber DSH",
     "asarUnpack": [
       "node_modules/7zip-bin/win/**/*",
       "node_modules/@openchamber/web/server/built-in-extensions/**/*",
@@ -210,7 +210,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "openchamber",
+      "owner": "rohanpandula",
       "repo": "openchamber"
     }
   }

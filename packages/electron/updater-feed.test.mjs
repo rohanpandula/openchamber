@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import test from 'node:test';
 
 import {
@@ -16,18 +17,22 @@ const overrideEnvironment = {
   OPENCHAMBER_UPDATER_E2E_URL: 'http://127.0.0.1:49152/updates/',
 };
 
-test('production updater feed is immutable GitHub configuration', () => {
+test('both update channels and packaged publishing stay on the DeepSeek fork', () => {
+  const manifest = JSON.parse(fs.readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
+  assert.deepEqual(manifest.build.publish, PRODUCTION_UPDATER_FEED);
+  assert.equal(manifest.build.appId, 'dev.rohan.openchamber.dsh');
+  assert.equal(manifest.build.productName, 'OpenChamber DSH');
   assert.equal(Object.isFrozen(PRODUCTION_UPDATER_FEED), true);
   assert.deepEqual(PRODUCTION_UPDATER_FEED, {
     provider: 'github',
-    owner: 'openchamber',
+    owner: 'rohanpandula',
     repo: 'openchamber',
   });
 });
 
 test('the Canary channel reads the canary pre-release; every other stored value is Stable', () => {
   assert.equal(resolveUpdaterFeed({ channel: 'canary' }), CANARY_UPDATER_FEED);
-  assert.equal(CANARY_UPDATER_FEED.url, 'https://github.com/openchamber/openchamber/releases/download/canary/');
+  assert.equal(CANARY_UPDATER_FEED.url, 'https://github.com/rohanpandula/openchamber/releases/download/canary/');
   assert.equal(resolveUpdaterFeed({ channel: 'stable' }), PRODUCTION_UPDATER_FEED);
   assert.equal(normalizeUpdateChannel('canary'), 'canary');
   for (const value of ['stable', undefined, null, 'beta', 'Canary', 1]) assert.equal(normalizeUpdateChannel(value), 'stable');

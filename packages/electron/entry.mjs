@@ -10,6 +10,7 @@
 
 import { app, protocol } from 'electron';
 import path from 'node:path';
+import { configureDeepSeekDesktop } from './deepseek-desktop.mjs';
 import { enableMainProcessCompileCache } from './compile-cache.mjs';
 import { shouldIgnoreLoopbackConnectionLimit } from './startup-url-selection.mjs';
 import {
@@ -24,12 +25,13 @@ import {
   startShellEnvironmentProbe,
 } from './early-startup.mjs';
 
+if (app.isPackaged) configureDeepSeekDesktop({ homeDir: app.getPath('home'), appDataDir: app.getPath('appData') });
 recordEarlyStartupMark('electron.entry');
 
 // Set the product name early so electron-log derives its log directory as
 // ~/Library/Logs/OpenChamber/ (not ~/Library/Logs/@openchamber/electron/).
 const versionBeforeRename = app.getVersion();
-app.setName('OpenChamber');
+app.setName('OpenChamber DSH');
 // An unpackaged run on Linux reports version "0.0" after the rename, and
 // electron-updater refuses a version that is not semver, so the dev app quit
 // before its first window. Restoring the version from before the rename gives
