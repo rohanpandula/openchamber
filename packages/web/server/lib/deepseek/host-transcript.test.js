@@ -25,6 +25,13 @@ describe('shared Harness history', () => {
     expect(records[1].info.time.completed).toBe(1006);
     expect(records[0].info.time.created).toBeLessThan(records[1].info.time.created);
   });
+  it('preserves the user answer to a continued question in history', () => {
+    const transcript = createHostTranscript({ sessionID: 'ses_test', directory: '/tmp' });
+    transcript.accept({ type: 'user/message', seq: 1, time: 1, data: {
+      source: { kind: 'user-question-reply', callId: 'color' }, content: [{ type: 'text', text: 'Green' }],
+    } });
+    expect(transcript.records()[0].parts[0].text).toBe('Green');
+  });
   it('reconstructs a live packed text baseline and applies the next host frame', () => {
     const transcript = createHostTranscript({ sessionID: 'ses_test', directory: '/tmp' });
     transcript.baseline({ attemptId: 'a', turn: 1, step: 1, nextIndex: 8, stream: [

@@ -48,7 +48,7 @@ export function createHostTranscript({ sessionID, directory, publish = () => {} 
     if (seen.has(event.seq)) return;
     seen.add(event.seq);
     const data = dataSchema.parse(event.data);
-    if (event.type === 'user/message' && data.source?.kind === 'user') {
+    if (event.type === 'user/message' && ['user', 'user-question-reply'].includes(data.source?.kind)) {
       const id = z.string().startsWith('msg_').safeParse(data.source?.rpcId).data || `msg_dsh_${Buffer.from(sessionID).toString('base64url')}_u${event.seq}`;
       const parts = contentSchema.parse(data.content).filter((b) => b.type === 'text').map((b, i) => ({ id: `${id}_${i}`, messageID: id, sessionID, type: 'text', text: b.text || '' }));
       const info = { id, sessionID, role: 'user', time: { created: event.time } };
