@@ -90,6 +90,19 @@ describe('DeepSeek routes on the current OpenCode API', () => {
     expect((await response.json()).data.id).toBe('ses_client');
     expect((await f.post('/api/session/ses_client/prompt', { text: 'hi' })).status).toBe(200);
   });
+  it('delivers queued text and context through the existing Harness session', async () => {
+    const f = await fixture();
+    const { data: session } = await (await f.create()).json();
+    const dispatch = await f.integration.getSessionDispatch(session.id);
+    expect(await dispatch.isIdle()).toBe(true);
+    await dispatch.send({ id: 'queued_test', text: 'queued hello', context: [{ text: 'context' }], attachments: [],
+      sendConfig: { providerID: 'deepseek-harness', modelID: 'deepseek-v4-flash', agent: 'build' } });
+    await eventually(() => f.events.some((event) => event.payload.type === 'session.execution.succeeded'));
+    const messages = await (await fetch(`${f.url}/api/session/${session.id}/message`)).json();
+    expect(messages.data.find((message) => message.id === 'msg_queue_queued_test').text).toContain('queued hello');
+    process.env.OPENCHAMBER_ENTERPRISE_MODE = '1';
+    await expect(dispatch.send({ sendConfig: {} })).rejects.toThrow('not available');
+  });
   it('round-trips a permission through the v2 endpoint', async () => {
     const f = await fixture();
     const { data: session } = await (await f.create()).json();

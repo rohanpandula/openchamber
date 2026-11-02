@@ -42,7 +42,7 @@ The shared-host connection uses the same running Harness sessions as its desktop
 
 Download the Apple Silicon macOS package from [this fork's Releases page](https://github.com/rohanpandula/openchamber/releases/latest), open the DMG, and drag **OpenChamber DSH** into Applications. Configure Harness using the [DeepSeek setup](#configure-deepseek), then open the app and select **DeepSeek Harness** in the model picker.
 
-The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.7**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
+The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.8**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
 
 ### Build from source
 

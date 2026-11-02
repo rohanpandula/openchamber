@@ -254,6 +254,7 @@ export function createMessageQueueRuntime({
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   sessionKnowledgeRuntime = null,
+  getSessionDispatch = async () => null,
   broadcastGlobalUiEvent,
   onPromptSent,
   beforeScheduledTaskSend,
@@ -682,7 +683,15 @@ export function createMessageQueueRuntime({
       return;
     }
 
-    const idle = await isSessionIdle(sessionId, queue.directory);
+    let dispatch;
+    let idle;
+    try {
+      dispatch = await getSessionDispatch(sessionId);
+      idle = dispatch ? await dispatch.isIdle() : await isSessionIdle(sessionId, queue.directory);
+    } catch {
+      armDispatch(sessionId, retryDelayMs(1));
+      return;
+    }
     if (idle === null) {
       if (head.scheduledTask && validateScheduledTaskTarget) {
         try {
@@ -707,7 +716,7 @@ export function createMessageQueueRuntime({
     // background subagent works and runs again when OpenCode hands the
     // result back, so the turn is only over once no subagent runs. That rerun
     // re-arms through its idle event; the recheck covers a missed one.
-    const subagentsWorking = await hasWorkingSubagents(sessionId);
+    const subagentsWorking = dispatch ? false : await hasWorkingSubagents(sessionId);
     if (subagentsWorking !== false) {
       armDispatch(sessionId, subagentsWorking === null ? retryDelayMs(1) : SUBAGENT_RECHECK_MS);
       return;
@@ -735,7 +744,8 @@ export function createMessageQueueRuntime({
           return;
         }
       }
-      await sendItem(sessionId, current.directory, item);
+      if (dispatch) await dispatch.send(item);
+      else await sendItem(sessionId, current.directory, item);
       const after = queues.get(sessionId);
       if (after) setQueueItems(sessionId, after.directory, after.items.filter((entry) => entry.id !== item.id), 'sent');
       failures.delete(sessionId);

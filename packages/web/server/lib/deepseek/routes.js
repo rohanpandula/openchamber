@@ -267,5 +267,35 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
       return res.status(501).json({ error: 'This operation is not supported by DeepSeek Harness.' });
     }));
   }
-  return { register, decorateSession, runtime, stop: () => runtime.shutdownAll() };
+  async function getSessionDispatch(sessionID) {
+    const session = await runtime.getSession({ sessionID });
+    if (!session) {
+      if (shared?.owns(sessionID)) throw new Error('DeepSeek transcript is unavailable; queued delivery will retry.');
+      let native;
+      try { native = await nativeSession(sessionID); } catch (error) { if (!isSessionNotFoundError(error)) throw error; }
+      if (native?.metadata?.openchamberBackend === 'deepseek') throw new Error('DeepSeek transcript is unavailable; queued delivery will retry.');
+      return null;
+    }
+    return {
+      isIdle: async () => !(await runtime.getStatusSnapshot()).busySessions.includes(sessionID),
+      async send(item) {
+        if (!enabled()) throw new Error('DeepSeek Harness is not available for queued delivery.');
+        const selected = modelSchema.parse({ providerID: item.sendConfig.providerID, id: item.sendConfig.modelID });
+        if (selected.id !== modelId) throw new Error('This model is not configured in DeepSeek Harness.');
+        if (item.goal || item.scheduledTask || item.agentMention || (item.sendConfig.agent && item.sendConfig.agent !== 'build')) {
+          throw new Error('DeepSeek Harness does not support this queued goal, task or agent.');
+        }
+        const parts = [...item.context.flatMap((part) => [part.instructions, part.text].filter(Boolean).map((text) => ({ type: 'text', text }))), { type: 'text', text: item.text }];
+        for (const attachment of item.attachments) {
+          const match = /^data:(image\/[^;,]+);base64,([A-Za-z0-9+/=\s]+)$/.exec(attachment.dataUrl);
+          if (!match) throw new Error('DeepSeek Harness queued attachments must be base64 images.');
+          parts.push({ type: 'file', mime: match[1], url: attachment.dataUrl, filename: attachment.filename });
+        }
+        // Shared chats retain the model selected in Harness, like direct sends.
+        await runtime.promptAsync({ sessionID, messageID: `msg_queue_${item.id}`, directory: session.directory,
+          model: { providerID: env.DEEPSEEK_PROVIDER || 'deepseek-official', modelID: modelId }, parts });
+      },
+    };
+  }
+  return { register, decorateSession, getSessionDispatch, runtime, stop: () => runtime.shutdownAll() };
 }

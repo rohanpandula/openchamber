@@ -1321,6 +1321,7 @@ autoReviewRuntime.start();
 // Queued follow-up messages are delivered by the server so a closed tab or a
 // dropped connection no longer strands them (VS Code keeps its UI-side queue).
 const messageQueueRuntime = createMessageQueueRuntime({
+  getSessionDispatch: (id) => deepSeekIntegration.getSessionDispatch(id),
   globalEventHub: globalMessageStreamHub,
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,

@@ -22,6 +22,16 @@ session-knowledge runtime; routes registered in
 JSON bodies enabled in `opencode/core-routes.js`; stopped by
 `opencode/shutdown-runtime.js`.
 
+## Backend ownership
+
+`getSessionDispatch` resolves an external session owner before checking idleness
+or sending. DeepSeek queues use Harness live status and its prompt runtime; they
+never switch models or send prompts through the OpenCode index. Failed owner
+lookups retry without falling back, and failed sends retain the queued item.
+Shared Harness chats retain their native model selection, just as direct sends
+do; the captured OpenChamber provider/model identifies the bridge, not a request
+to overwrite a model selected in Harness.
+
 ## Auto routing
 
 `resolveAutoSelection` (the routing runtime) runs right before the send when

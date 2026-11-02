@@ -40,6 +40,9 @@ Harness chats retain their own runtime and model selection.
   Project registration upserts exact Harness workspace paths and labels through
   the settings write queue without changing
   the active project. Clients refresh settings after a new project is added.
+- Queued follow-ups use the same Harness runtime and live status as direct sends.
+  The OpenCode index never executes them. Unsupported queued goals/tasks/agents
+  and non-image attachments fail without removing the queued item.
 - Shared history never resumes a second agent. Requested subscriptions survive
   host reconnects. Old generations and replaced subscriptions cannot publish
   late results. A broken stream is canceled and retried from a fresh baseline.

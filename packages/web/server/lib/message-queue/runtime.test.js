@@ -86,7 +86,7 @@ const createOpenCode = () => {
   return { state, fetchImpl };
 };
 
-const createRuntime = ({ dataDir = makeDataDir(), openCode = createOpenCode(), knowledge = null, retryDelayMs, resolveAutoSelection, now, beforeScheduledTaskSend, onScheduledTaskResult, persistSessionGoal, isDeliveryHeld, deliveryHoldReady } = {}) => {
+const createRuntime = ({ dataDir = makeDataDir(), openCode = createOpenCode(), knowledge = null, retryDelayMs, resolveAutoSelection, now, beforeScheduledTaskSend, onScheduledTaskResult, persistSessionGoal, isDeliveryHeld, deliveryHoldReady, getSessionDispatch } = {}) => {
   let eventHandler = () => {};
   let statusHandler = () => {};
   const broadcasts = [];
@@ -107,6 +107,7 @@ const createRuntime = ({ dataDir = makeDataDir(), openCode = createOpenCode(), k
     abortHoldMs: 50,
     beforeScheduledTaskSend,
     onScheduledTaskResult,
+    getSessionDispatch,
   };
   if (retryDelayMs) options.retryDelayMs = retryDelayMs;
   if (resolveAutoSelection) options.resolveAutoSelection = resolveAutoSelection;
@@ -1038,5 +1039,34 @@ describe('message queue runtime', () => {
       `/api/session/${SESSION}/prompt`,
     ]);
     expect(openCode.state.sent[0].body).toEqual({ sessionId: SESSION, directory: DIRECTORY });
+  });
+});
+
+ describe('external session dispatch', () => {
+  it('uses the owning backend for both live status and queued sends', async () => {
+    let busy = true;
+    const send = vi.fn(async () => {});
+    const { runtime, openCode } = createRuntime({ getSessionDispatch: async () => ({ isIdle: async () => !busy, send }) });
+    try {
+      await runtime.enqueue(SESSION, DIRECTORY, item());
+      await settle();
+      expect(send).not.toHaveBeenCalled();
+      expect(openCode.state.sent).toEqual([]);
+      busy = false;
+      runtime.release(SESSION);
+      await settle();
+      expect(send).toHaveBeenCalledTimes(1);
+      expect(openCode.fetchImpl).not.toHaveBeenCalled();
+      expect(runtime.sessionSnapshot(SESSION).items).toEqual([]);
+    } finally { runtime.stop(); await runtime.flush(); }
+  });
+  it('keeps queued messages when the owning backend is unavailable', async () => {
+    const { runtime, openCode } = createRuntime({ getSessionDispatch: async () => { throw new Error('offline'); }, retryDelayMs: () => 10000 });
+    try {
+      await runtime.enqueue(SESSION, DIRECTORY, item());
+      await settle();
+      expect(runtime.sessionSnapshot(SESSION).items).toHaveLength(1);
+      expect(openCode.fetchImpl).not.toHaveBeenCalled();
+    } finally { runtime.stop(); await runtime.flush(); }
   });
 });
