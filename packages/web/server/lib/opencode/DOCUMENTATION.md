@@ -1317,3 +1317,10 @@ appends new IDs or merges the resolved fields into that same existing ID, leavin
 other project fields, projects, and active navigation unchanged. Harness workspace
 label changes use this path; ordinary directory adoption returns the existing
 entry unchanged.
+
+### Injected events on the global SSE stream
+
+The global event proxy merges hub-injected host events and isolated-space events
+with OpenCode's upstream stream. It subscribes even when spaces are disabled so
+DeepSeek replies reach SSE clients. Ordinary upstream host events are excluded
+from this merge to avoid duplicates; writes preserve complete SSE blocks.

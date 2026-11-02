@@ -1,7 +1,7 @@
 # Event Stream Module Documentation
 
 ## Purpose
-This module contains the OpenChamber message-stream WebSocket protocol and runtime bridge. It keeps the browser-facing WebSocket transport separate from the upstream OpenCode SSE transport.
+This module contains the OpenChamber message-stream WebSocket protocol and runtime bridge. It keeps browser-facing transports separate from the upstream OpenCode SSE transport and merges injected backend events into both WebSocket and global SSE delivery.
 
 ## Entrypoints and structure
 - `packages/web/server/lib/event-stream/index.js`: public entrypoint re-exporting protocol and runtime helpers.
@@ -84,7 +84,11 @@ The hub commits pending text when it stops, so it reaches the retained replay su
 
 Verified against a live server by dropping the socket every 150ms to 3s during a stream and resuming from the cursor: the reconstructed text matched byte for byte with no duplicate ids. Server-side hub subscribers receive merged events as well. None of them reads individual deltas.
 
-The directory WS bridge and the SSE proxy (`/api/global/event`, used by Capacitor) still forward unmerged events.
+The directory WS bridge and SSE proxy still forward upstream events unmerged.
+The global SSE proxy also carries injected host events (including DeepSeek) and
+space events from the hub. The hub marks injected envelopes so the proxy does
+not duplicate OpenCode events it already forwards. Injected blocks share the
+existing write queue and wait for upstream SSE block boundaries.
 
 ## Notes for contributors
 - Keep protocol helpers pure and small so they can be unit tested without spinning up a server.

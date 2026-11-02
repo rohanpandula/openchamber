@@ -1102,9 +1102,10 @@ describe('OpenCode proxy SSE forwarding', () => {
     expect(options).toEqual({ spaces: true });
     // A host event of the hub is not written twice; a space event is written as one block.
     subscriber({ spaceId: null, payload: { id: 'x', type: 'host-from-hub' } });
+    subscriber({ spaceId: null, envelope: { injected: true }, payload: { id: 'd1', type: 'session.text.delta' } });
     subscriber({ spaceId: 'a1b2c3d4e5f6', payload: { id: 's1', type: 'session.execution.started', location: { directory: '/spaces/a1b2c3d4e5f6/repo' } } });
     await readUntil('"s1"');
-    expect(text).toBe('data: {"id":"h1","type":"host"}\n\ndata: {"id":"s1","type":"session.execution.started","location":{"directory":"/spaces/a1b2c3d4e5f6/repo"}}\n\n');
+    expect(text).toBe('data: {"id":"h1","type":"host"}\n\ndata: {"id":"d1","type":"session.text.delta"}\n\ndata: {"id":"s1","type":"session.execution.started","location":{"directory":"/spaces/a1b2c3d4e5f6/repo"}}\n\n');
     // Half a block of the host's holds a space event back until the block is whole.
     upstreamRes.write('data: {"id":"h2",');
     await readUntil('"h2"');

@@ -217,7 +217,7 @@ export function createGlobalMessageStreamHub({
      * a client keeps one cursor for everything. `directory` is the space's, `spaceId` marks it.
      */
     injectEvent({ payload, directory, spaceId }) {
-      coalescer.push({ envelope: { directory, spaceId }, payload });
+      coalescer.push({ envelope: { directory, spaceId, injected: true }, payload });
     },
     subscribeStatus(subscriber) {
       statusSubscribers.add(subscriber);

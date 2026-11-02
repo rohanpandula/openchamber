@@ -835,7 +835,7 @@ export const registerOpenCodeProxy = (app, deps) => {
       };
       if (spaceEventHub && isGlobalStream) {
         unsubscribeSpaceEvents = spaceEventHub.subscribeEvent((event) => {
-          if (event.spaceId === null) return;
+          if (event.spaceId === null && !event.envelope?.injected) return;
           pendingSpaceBlocks.push(`data: ${JSON.stringify(event.payload)}\n\n`);
           void flushSpaceBlocks();
         }, { spaces: true });

@@ -350,7 +350,7 @@ describe('events of isolated spaces in the global hub', () => {
   it('marks a host event with no space, so every subscriber sees it', () => {
     const hub = makeHub();
     const seen = [];
-    hub.subscribeEvent(event => seen.push(event.spaceId));
+    hub.subscribeEvent(event => { expect(event.envelope.injected).toBe(true); seen.push(event.spaceId); });
     hub.subscribeEvent(event => seen.push(event.spaceId), { spaces: true });
     hub.injectEvent({ payload: { type: 'session.execution.started', data: { sessionID: 's1' } }, directory: '/home/me', spaceId: null });
     expect(seen).toEqual([null, null]);
