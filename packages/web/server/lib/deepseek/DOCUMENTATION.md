@@ -2,65 +2,74 @@
 
 ## Ownership
 
-This module carries the fork's DeepSeek Harness ACP adapter onto OpenChamber 2.x.
-`deepseek-appserver.js` and `jsonrpc-subprocess.js` own the child process and ACP
-conversation. `deepseek-backend.js` owns persisted transcripts and pending turns.
-`wire.js` maps those records and events to the current OpenCode wire vocabulary.
-`routes.js` registers the adapter after the proxy's authentication, checkout and
-configuration trust gates, before ordinary OpenCode forwarding.
+This module connects OpenChamber to DeepSeek Harness. Shared-host mode attaches
+to the running Harness desktop host; ACP mode owns a separate subprocess for
+legacy OpenChamber conversations. `routes.js` selects the owner and maintains
+OpenCode index records. The shared UI, desktop, hosted mobile and Capacitor use
+the same authenticated server routes. VS Code does not advertise this provider.
 
-Set `DEEPSEEK_DSH_BIN` to enable the integration. `DEEPSEEK_DSH_ARGS` selects the
-profile and optional patch. The executable receives the existing environment;
-credentials remain in dsh's credential service. `DEEPSEEK_PROVIDER` and
-`DEEPSEEK_MODEL` identify the provider/model configured by that profile. The
-model appears under **DeepSeek Harness** in the normal model picker. The HTTP
-port uses `DEEPSEEK_MODEL`; the legacy adapter's `DEEPSEEK_MODELS` list does not
-add entries to this picker.
+`host-discovery.mjs` runs as a Harness plugin and publishes its authenticated
+loopback URL to a private file. `host-connection.js` owns that credential, the
+API peer, HTTP calls, multiplexed streams and reconnect. `host-runtime.js` owns
+session membership, followed histories and index reconciliation.
+`host-transcript.js` maps durable events and live assistant frames to records;
+`wire.js` maps records to OpenCode's UI vocabulary. The ACP files retain their
+existing subprocess, persistence and permission ownership.
 
-Web and Electron run this module. Hosted mobile and Capacitor clients use their
-connected server's integration and existing authenticated transports. VS Code
-runs its own backend and does not advertise this provider. No new listener,
-relay protocol, browser credential or desktop IPC capability is introduced.
+`DEEPSEEK_HOST_FILE` selects shared-host mode. The setup script installs the
+plugin into the user's configuration and saves `hostFile` in `deepseek.json`;
+the packaged desktop launcher loads it. `DEEPSEEK_DSH_BIN`,
+`DEEPSEEK_DSH_ARGS`, `DEEPSEEK_PROVIDER` and `DEEPSEEK_MODEL` configure ACP and
+the advertised model. New shared chats select the configured model. Existing
+Harness chats retain their own runtime and model selection.
 
 ## Invariants
 
-- Native OpenCode session records remain the authoritative index, including
-  pagination, folders, archive state and session metadata. DeepSeek records keep
-  the same session ID and live beside them in `deepseek-sessions.json`.
-- Only sessions created with the `deepseek-harness` model use ACP. Native
-  metadata records that choice; client-generated session IDs are preserved.
-  A missing transcript fails explicitly, without sending its
-  prompt to OpenCode or another provider.
-- One live turn runs per session. A process failure ends that turn; pending
-  approvals cannot be answered after their owning process is gone.
-- Text, reasoning and tool events retain the same message and content ordering
-  as transcript reads. The shared event hub supplies transport replay.
-- Prompt bodies are limited to 12 MiB. Message pages default to 100 records,
-  permit at most 1000 and use the last returned message ID as their cursor.
-- The current port offers one configured model. Unsupported operations return
-  an explicit error. OpenCode agent/skill attachments, shell turns, compaction,
-  forks, moving a session and switching an existing session's backend are not
-  claimed as supported.
-- Enterprise mode suppresses discovery and refuses creation, prompt submission
-  and approval responses. A request cannot bypass this gate by knowing a session
-  ID. Existing transcripts remain readable.
+- Harness is authoritative for shared chat history, titles and running status.
+  OpenCode holds index records so existing sidebar pagination and folders work.
+  Only root chats are indexed; `origin: subagent` records remain in their parent
+  chat's tool output. Ordinary forks remain distinct chats.
+- Host IDs map deterministically to native IDs. Legacy ACP bindings retain their
+  original native IDs. Dispatch waits for shared-host ownership and never starts
+  ACP as a fallback for a disconnected shared chat.
+- Index failures retry without clearing successful rows. Index metadata writes
+  use the existing serialized metadata store, preserving concurrent user edits.
+  Project registration appends through the settings write queue without changing
+  the active project. Clients refresh settings after a new project is added.
+- Shared history never resumes a second agent. Requested subscriptions survive
+  host reconnects. Old generations and replaced subscriptions cannot publish
+  late results. A broken stream is canceled and retried from a fresh baseline.
+- User request IDs survive history conversion, allowing optimistic UI messages
+  to reconcile. Text, tool calls and results retain their parent step identities.
+- The connection file is owned by this OS user, mode 0600, under a private
+  directory. Only authenticated `http://127.0.0.1` discovery is accepted. Tokens
+  remain server-side and are never returned to browsers or included in events.
+  Stopping OpenChamber closes its peer, not the Harness process or its sessions.
+- Enterprise mode disables shared-host connection and DeepSeek execution. The
+  existing HTTP authentication and trust gates remain in front of these routes.
+- Shared-host approvals and interactive questions remain in Harness. The bridge
+  delegates unhandled waterfalls rather than approving them. ACP permission
+  replies remain supported. Shared deletion is refused before native deletion.
+- OpenCode-specific forks, moves, shell turns, compaction and agent/skill
+  attachments remain unsupported. The model picker advertises one configured
+  model; upstream features are not promises of DeepSeek compatibility.
 
 ## Decisions
 
-### Why retain native session records
+### Why attach to the existing host
 
-The current UI relies on OpenCode's session index for cursor pagination and
-workspace state. A native record avoids a second pagination and folder system;
-its model is projected from the stored DeepSeek metadata.
+A new ACP process owns different live agents, even when it reads the same
+persisted logs. Attaching to Harness's authenticated API allows both interfaces
+to operate the same running chat without duplicate sessions or writer conflicts.
 
-### Why retain the fork's ACP runtime
+### Why keep the connection plugin outside the app
 
-The existing adapter already owns cancellation, approval round trips, restart
-and transcript persistence. Porting that boundary preserves its tested behavior
-without restoring the fork's obsolete UI and sync refactor.
+The Harness profile and private connection file survive replacing OpenChamber.
+The plugin uses Harness's authentication API instead of extracting desktop
+cookies or modifying the signed Harness application.
 
-### Why keep unsupported operations explicit
+### Why retain native index records and legacy bindings
 
-The native OpenCode record contains no DeepSeek transcript. Forwarding a fork,
-compaction or shell request to OpenCode would operate on an empty conversation
-or execute through the wrong engine.
+OpenChamber's sidebar relies on OpenCode pagination and metadata. Stable index
+records preserve that contract, and binding old ACP identities prevents an
+existing chat from appearing again under a new imported ID.

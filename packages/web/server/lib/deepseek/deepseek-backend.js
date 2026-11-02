@@ -935,6 +935,10 @@ export const createDeepSeekBackendRuntime = (dependencies = {}) => {
     resolveBinary: () => appServer.resolveBinary(),
 
     listSessions,
+    async sessionBindings() {
+      await ensureLoaded();
+      return new Map([...sessions.values()].filter((entry) => entry.acpSessionId).map((entry) => [entry.acpSessionId, entry.session.id]));
+    },
     getSession,
     getMessages,
     createSession,

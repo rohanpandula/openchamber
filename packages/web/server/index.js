@@ -1234,11 +1234,24 @@ const globalMessageStreamHub = createGlobalMessageStreamHub({
   deltaCoalesceWindowMs: resolveDeltaCoalesceWindowMs(),
 });
 
+let deepSeekProjectsChangedTimer;
 const deepSeekIntegration = createDeepSeekIntegration({
   dataDir: OPENCHAMBER_DATA_DIR,
   buildOpenCodeUrl,
   getOpenCodeAuthHeaders,
   publish: (event) => globalMessageStreamHub.injectEvent(event),
+  registerProject: settingsRuntime.registerSessionProject,
+  updateMetadata: (id, patch) => sessionMetadataStore.setSessionMetadata(id, patch),
+  onProjectsChanged: () => {
+    clearTimeout(deepSeekProjectsChangedTimer);
+    deepSeekProjectsChangedTimer = setTimeout(() => {
+      for (const client of uiOpenChamberEventClients) {
+        try { writeSseEvent(client, { type: 'openchamber:settings-changed', properties: {} }); }
+        catch { uiOpenChamberEventClients.delete(client); }
+      }
+    }, 150);
+    deepSeekProjectsChangedTimer.unref?.();
+  },
 });
 
 // Jev model routing and the permission safety net. Every failure keeps the

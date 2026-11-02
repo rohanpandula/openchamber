@@ -34,7 +34,7 @@ OpenChamber is the interface. The agent runtime executes tools and talks to the 
 | **Model provider** | The service configured in Harness that runs the model |
 | **OpenCode** | The bundled desktop runtime for regular sessions and the shared project/session index |
 
-The DeepSeek adapter uses ACP, a protocol for connecting an editor or app to an agent. You do not need to work with the protocol to use the app.
+The shared-host connection uses the same running Harness sessions as its desktop app. An ACP connection is also available for older standalone OpenChamber conversations. You do not need to work with either protocol to use the app.
 
 ## Get started
 
@@ -42,7 +42,7 @@ The DeepSeek adapter uses ACP, a protocol for connecting an editor or app to an 
 
 Download the Apple Silicon macOS package from [this fork's Releases page](https://github.com/rohanpandula/openchamber/releases/latest), open the DMG, and drag **OpenChamber DSH** into Applications. Configure Harness using the [DeepSeek setup](#configure-deepseek), then open the app and select **DeepSeek Harness** in the model picker.
 
-The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The first fork release is **2.5.4**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
+The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.5**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
 
 ### Build from source
 
@@ -126,9 +126,23 @@ These are example provider/model values. Use the identifiers from your working H
 | `provider` | The provider identifier configured in that Harness profile |
 | `model` | The model identifier available through that provider |
 
-Keep credentials in Harness's credential storage. The adapter starts your local `dsh` process and uses its existing authentication. It does not require copying API keys into this repository.
+### Keep Harness and OpenChamber in sync
 
-You can override these values with `DEEPSEEK_DSH_BIN`, `DEEPSEEK_DSH_ARGS`, `DEEPSEEK_PROVIDER`, and `DEEPSEEK_MODEL` in the app's launch environment. A missing configuration leaves DeepSeek unavailable unless those environment variables configure it. Invalid JSON or missing required fields prevents startup with a configuration error.
+After configuring DeepSeek, run this once from a source checkout. If you installed the DMG, download or clone this repository for the setup command:
+
+```bash
+node scripts/connect-deepseek-desktop.mjs
+```
+
+Restart **OpenChamber DSH**. Harness loads the small connection plugin without restarting its running sessions. Keep Harness open while using shared chats.
+
+Existing top-level Harness chats then appear in OpenChamber, grouped by their folders. Messages, streamed replies, titles, and running status stay in sync in both directions. Subagent work remains inside its parent chat instead of appearing as separate sidebar conversations. A disconnected host reconnects automatically; it never silently starts another agent process for that chat.
+
+The setup script saves `hostFile` in `deepseek.json` and installs the plugin under `~/.config/openchamber-dsh-v2/harness/`. Both survive app updates. The connection file is private to your user and contains a temporary local authentication URL. Do not share it or commit it.
+
+Keep provider credentials in Harness's credential storage. No API keys belong in this repository. Without shared-host setup, OpenChamber uses its own ACP process and only shows conversations created through that connection.
+
+You can override these values with `DEEPSEEK_DSH_BIN`, `DEEPSEEK_DSH_ARGS`, `DEEPSEEK_PROVIDER`, `DEEPSEEK_MODEL`, and `DEEPSEEK_HOST_FILE` in the app's launch environment. A missing configuration leaves DeepSeek unavailable unless those environment variables configure it. Invalid JSON or missing required fields prevents startup with a configuration error.
 
 ### Browser development
 
@@ -150,8 +164,11 @@ Open the Vite URL printed by the command. The server runs on your machine; the b
 | --- | --- |
 | Text chat and streamed responses | Supported |
 | Reasoning and tool output | Supported when emitted by Harness |
-| Tool permissions and cancellation | Supported |
+| Cancellation | Supported |
+| Tool permissions and interactive questions | Answer in Harness for shared-host chats; ACP permissions work in OpenChamber |
 | Saved conversations and restart recovery | Supported |
+| Two-way Harness desktop sync | Shared-host setup required |
+| Subagents | Kept inside their parent chat |
 | Image attachments | Passed to Harness; model support varies |
 | Multiple DeepSeek models in one configured app | One configured model at a time |
 | Token and cost accounting | Not reported; counters currently show zero |
@@ -180,7 +197,7 @@ Saved conversations and connection settings live outside the app bundle:
 
 | Data | Default location on macOS |
 | --- | --- |
-| DeepSeek settings and transcripts | `~/.config/openchamber-dsh-v2/` |
+| DeepSeek settings, shared-host plugin, and legacy ACP transcripts | `~/.config/openchamber-dsh-v2/` |
 | Bundled OpenCode configuration and data | `runtime-config/` and `runtime-data/` inside that directory |
 | Desktop window and browser state | `~/Library/Application Support/OpenChamber DSH 2/` |
 | Harness credentials | Harness's own credential storage |
@@ -209,6 +226,7 @@ Resolve any conflicts before building. Preserve the DeepSeek adapter, desktop st
 
 | Problem | Check |
 | --- | --- |
+| Shared chats are unavailable | Open Harness and wait for reconnection; rerun the shared-host setup script if the profile was reset |
 | No DeepSeek Harness model in the picker | Check `deepseek.json`, the `binary` path, and whether `dsh` runs; restart the app |
 | Model or authentication error | Run Harness directly with the same profile and patch; confirm the provider/model identifiers and credentials there |
 | App fails immediately after editing configuration | Validate the JSON and supply all four required fields |
@@ -227,7 +245,7 @@ The code is organized as a monorepo:
 | Directory | Contains |
 | --- | --- |
 | `packages/ui` | Shared React interface and session state |
-| `packages/web` | Web app, server, and DeepSeek ACP adapter |
+| `packages/web` | Web app, server, and DeepSeek shared-host/ACP adapters |
 | `packages/electron` | Desktop launcher, native integrations, and updater |
 | `packages/vscode` | VS Code extension |
 | `packages/mobile` | Native mobile shell |

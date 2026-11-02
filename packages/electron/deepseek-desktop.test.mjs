@@ -64,3 +64,15 @@ test('Linux desktop services keep their normal XDG directories', (t) => {
   assert.equal(environment.XDG_CONFIG_HOME, undefined);
   assert.equal(environment.XDG_DATA_HOME, undefined);
 });
+
+test('shared host configuration survives repeated packaged launches', (t) => {
+  const paths = fixture(t);
+  const hostFile = path.join(paths.dataDir, 'harness', 'connection.json');
+  fs.writeFileSync(path.join(paths.dataDir, 'deepseek.json'), JSON.stringify({ ...config, hostFile }));
+  for (let launch = 0; launch < 2; launch++) {
+    const environment = {};
+    configureDeepSeekDesktop({ environment, ...paths });
+    assert.equal(environment.DEEPSEEK_HOST_FILE, hostFile);
+    assert.deepEqual(withoutInjectedEnv(environment), {});
+  }
+});

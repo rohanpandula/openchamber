@@ -3,8 +3,11 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { isSessionNotFoundError } from '@opencode/client';
 import { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
+import { createProjectIdFromPath } from '../projects/project-id.js';
 import { isEnterpriseMode } from '../enterprise-mode.js';
+import { createSharedHostRuntime } from './host-runtime.js';
 import { createDeepSeekBackendRuntime } from './deepseek-backend.js';
 import { createEventBridge, messageInfo, modelInfo, permissionInfo, providerInfo, PROVIDER_ID } from './wire.js';
 
@@ -21,11 +24,12 @@ const promptSchema = z.object({
 });
 const sessionPrefix = 'ses_dsh_';
 
-export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCodeAuthHeaders, publish, env = process.env }) {
+export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCodeAuthHeaders, publish, registerProject, updateMetadata, onProjectsChanged = () => {}, env = process.env }) {
   const modelId = env.DEEPSEEK_MODEL || 'deepseek-v4-flash';
   const model = { providerID: PROVIDER_ID, id: modelId };
   const client = (directory) => createOpenCodeClient({ baseUrl: buildOpenCodeUrl('', ''), headers: getOpenCodeAuthHeaders(), directory });
-  const runtime = createDeepSeekBackendRuntime({
+  const bridge = createEventBridge({ publish, modelId });
+  const acp = createDeepSeekBackendRuntime({
     crypto, fsPromises: fs, env,
     sessionsFilePath: path.join(dataDir, 'deepseek-sessions.json'),
     publishEvent: createEventBridge({ publish, modelId, onSessionUpdated: (session) => {
@@ -34,6 +38,76 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
       });
     } }),
   });
+  const nativeIndex = new Map();
+  const registeredDirectories = new Set();
+  const indexWrites = new Map();
+  async function syncNativeSession(session, isCurrent = () => true) {
+    const previous = indexWrites.get(session.id) || Promise.resolve();
+    const operation = previous.catch(() => {}).then(() => isCurrent() ? writeNativeSession(session) : undefined);
+    indexWrites.set(session.id, operation);
+    try { await operation; } finally { if (indexWrites.get(session.id) === operation) indexWrites.delete(session.id); }
+  }
+  async function writeNativeSession(session) {
+    if (isEnterpriseMode()) throw new Error('DeepSeek Harness is disabled in enterprise mode.');
+    let native = nativeIndex.get(session.id);
+    if (!native) {
+      try { native = await client().session.get({ sessionID: session.id }); }
+      catch (error) { if (!isSessionNotFoundError(error)) throw error; }
+      if (!native) native = await client().session.create({ id: session.id, title: session.title,
+        location: { directory: session.directory }, metadata: { openchamberBackend: 'deepseek', openchamberDeepSeekModel: modelId, openchamberDeepSeekUpdatedAt: session.time.updated } });
+      nativeIndex.set(session.id, native);
+    }
+    if (native.title !== session.title || native.metadata?.openchamberDeepSeekUpdatedAt !== session.time.updated) {
+      await client().session.update({ sessionID: session.id, title: session.title });
+      await updateMetadata?.(session.id, { openchamberDeepSeekUpdatedAt: session.time.updated });
+      nativeIndex.set(session.id, { ...native, title: session.title, metadata: { openchamberDeepSeekUpdatedAt: session.time.updated } });
+    }
+    if (registerProject && !registeredDirectories.has(session.directory)) {
+      let added = false;
+      await registerProject((projects) => {
+        const existing = projects.filter((project) => {
+          const relative = path.relative(project.path, session.directory);
+          return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
+        }).sort((a, b) => b.path.length - a.path.length)[0];
+        if (existing) return existing;
+        added = true;
+        return { id: createProjectIdFromPath(session.directory), path: session.directory, label: path.basename(session.directory), addedAt: Date.now(), lastOpenedAt: Date.now() };
+      });
+      registeredDirectories.add(session.directory);
+      if (added) onProjectsChanged();
+    }
+  }
+  const shared = env.DEEPSEEK_HOST_FILE && !isEnterpriseMode() ? createSharedHostRuntime({
+    loadSessionBindings: () => acp.sessionBindings(),
+    file: env.DEEPSEEK_HOST_FILE, model: modelId, provider: env.DEEPSEEK_PROVIDER || 'deepseek-official',
+    publishEvent: bridge,
+    onSession: syncNativeSession,
+    onStatus: (session, running) => bridge({ directory: session.directory, payload: running
+      ? { type: 'session.status', properties: { sessionID: session.id, status: { type: 'busy' } } }
+      : { type: 'session.idle', properties: { sessionID: session.id } } }),
+    onError: (error) => console.warn('[deepseek] Shared host:', error.message),
+  }) : null;
+  const runtime = {
+    ...acp,
+    isAvailable: () => Boolean(shared) || acp.isAvailable(),
+    async getStatusSnapshot() {
+      const local = await acp.getStatusSnapshot();
+      const host = shared ? await shared.getStatusSnapshot() : { busySessions: [] };
+      return { ...local, busySessions: [...local.busySessions, ...host.busySessions] };
+    },
+    shutdownAll() { shared?.shutdownAll(); return acp.shutdownAll(); },
+  };
+  for (const method of ['getSession', 'getMessages', 'promptAsync', 'abortSession', 'updateSession', 'deleteSession']) {
+    runtime[method] = async (input) => {
+      if (!shared) return acp[method](input);
+      if (shared.owns(input.sessionID)) return shared[method](input);
+      const legacy = await acp.getSession(input);
+      if (!legacy) return acp[method](input);
+      // Existing ACP identities must settle against the shared host before any write.
+      await shared.getSession(input);
+      return shared[method](input);
+    };
+  }
   const enabled = () => Boolean(env.DEEPSEEK_DSH_BIN && runtime.isAvailable() && !isEnterpriseMode());
   const decorateSession = (info) => info?.metadata?.openchamberBackend === 'deepseek' ? { ...info, model } : info;
   const canRun = (res) => {
@@ -49,7 +123,7 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
     try { await handler(req, res, next); }
     catch (error) {
       if (res.headersSent) return next(error);
-      res.status(error instanceof z.ZodError ? 400 : error.code === 'SESSION_BUSY' ? 409 : 500).json({ error: error.message });
+      res.status(error instanceof z.ZodError ? 400 : error.code === 'SESSION_BUSY' ? 409 : error.code === 'HOST_UNAVAILABLE' ? 503 : 500).json({ error: error.message });
     }
   };
   const nativeSession = async (id) => client().session.get({ sessionID: id });
@@ -71,6 +145,10 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
       if (!canRun(res)) return;
       const input = createSchema.parse(req.body);
       if (input.model.id !== modelId) return res.status(400).json({ error: 'This model is not configured in DeepSeek Harness.' });
+      if (shared) {
+        const session = await shared.createSession({ id: input.id, directory: input.location?.directory || directoryOf(req), title: input.title });
+        return res.json({ data: decorateSession(await nativeSession(session.id)) });
+      }
       const native = await client(input.location?.directory || directoryOf(req)).session.create({
         id: input.id || `${sessionPrefix}${crypto.randomUUID()}`, title: input.title,
         location: input.location, metadata: { ...input.metadata, openchamberBackend: 'deepseek', openchamberDeepSeekModel: modelId },
@@ -176,6 +254,7 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
         return reply.ok ? res.status(204).end() : res.status(404).json({ error: 'Permission is no longer pending' });
       }
       if (req.method === 'DELETE' && suffix === '/') {
+        if (shared?.owns(id)) await shared.deleteSession({ sessionID: id });
         await client().session.remove({ sessionID: id });
         await runtime.deleteSession({ sessionID: id }); return res.status(204).end();
       }

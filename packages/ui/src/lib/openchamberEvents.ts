@@ -623,6 +623,14 @@ const dispatchFromEnvelope = (envelope: { type: string; properties: unknown }) =
     return;
   }
 
+  if (envelope.type === 'openchamber:settings-changed') {
+    void import('./persistence').then(async ({ invalidateSettingsCache, syncDesktopSettings }) => {
+      invalidateSettingsCache();
+      await syncDesktopSettings({ bootstrap: false });
+    });
+    return;
+  }
+
   if (envelope.type === 'openchamber:session-created') {
     const properties = getEventProperties(envelope.properties);
     const sessionId = typeof properties?.sessionId === 'string' ? properties.sessionId : '';

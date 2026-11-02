@@ -8,6 +8,7 @@ const configSchema = z.object({
   args: z.string(),
   provider: z.string().min(1),
   model: z.string().min(1),
+  hostFile: z.string().min(1).optional(),
 }).strict();
 
 export function configureDeepSeekDesktop({ environment = process.env, homeDir, appDataDir, platform = process.platform }) {
@@ -37,4 +38,5 @@ export function configureDeepSeekDesktop({ environment = process.env, homeDir, a
     DEEPSEEK_PROVIDER: environment.DEEPSEEK_PROVIDER || config.provider,
     DEEPSEEK_MODEL: environment.DEEPSEEK_MODEL || config.model,
   });
+  if (config.hostFile) assignInjectedEnv(environment, { DEEPSEEK_HOST_FILE: environment.DEEPSEEK_HOST_FILE || config.hostFile });
 }
