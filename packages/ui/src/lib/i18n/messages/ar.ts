@@ -604,6 +604,7 @@ export const dict = {
   'sessions.sidebar.empty.noMatches.description': 'جرّب عنوانًا أو فرعًا أو مجلدًا أو مسارًا مختلفًا.',
   'sessions.sidebar.empty.noMatches.searchArchive': 'البحث في الأرشيف',
   'sessions.sidebar.activity.chatsTitle': 'المحادثات',
+  'sessions.sidebar.activity.ungroupedTitle': 'غير مجمّعة',
   'sessions.sidebar.activity.chatsEmpty': 'لا توجد محادثات بعد.',
   'chat.chatInput.chooseProject': 'اختر مشروعًا',
   'sessions.sidebar.header.projectDisplay.label': 'إظهار المشاريع',

@@ -656,6 +656,7 @@ export const dict = {
   'sessions.sidebar.empty.noMatches.description': 'Try a different title, branch, folder, or path.',
   'sessions.sidebar.empty.noMatches.searchArchive': 'Search the archive',
   'sessions.sidebar.activity.chatsTitle': 'Chats',
+  'sessions.sidebar.activity.ungroupedTitle': 'Ungrouped',
   'sessions.sidebar.activity.chatsEmpty': 'No chats yet.',
   'chat.chatInput.chooseProject': 'Choose project',
   'sessions.sidebar.header.projectDisplay.label': 'Show projects',

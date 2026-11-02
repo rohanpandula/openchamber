@@ -42,7 +42,7 @@ The shared-host connection uses the same running Harness sessions as its desktop
 
 Download the Apple Silicon macOS package from [this fork's Releases page](https://github.com/rohanpandula/openchamber/releases/latest), open the DMG, and drag **OpenChamber DSH** into Applications. Configure Harness using the [DeepSeek setup](#configure-deepseek), then open the app and select **DeepSeek Harness** in the model picker.
 
-The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.5**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
+The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.6**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
 
 ### Build from source
 
@@ -136,7 +136,7 @@ node scripts/connect-deepseek-desktop.mjs
 
 Restart **OpenChamber DSH**. Harness loads the small connection plugin without restarting its running sessions. Keep Harness open while using shared chats.
 
-Existing top-level Harness chats then appear in OpenChamber, grouped by their folders. Messages, streamed replies, titles, and running status stay in sync in both directions. Subagent work remains inside its parent chat instead of appearing as separate sidebar conversations. A disconnected host reconnects automatically; it never silently starts another agent process for that chat.
+Existing top-level Harness chats then appear in OpenChamber, grouped by their Harness workspaces, with unassigned chats under Ungrouped. Their working directories stay unchanged. Messages, streamed replies, titles, and running status stay in sync in both directions. Subagent work remains inside its parent chat instead of appearing as separate sidebar conversations. A disconnected host reconnects automatically; it never silently starts another agent process for that chat.
 
 The setup script saves `hostFile` in `deepseek.json` and installs the plugin under `~/.config/openchamber-dsh-v2/harness/`. Both survive app updates. The connection file is private to your user and contains a temporary local authentication URL. Do not share it or commit it.
 

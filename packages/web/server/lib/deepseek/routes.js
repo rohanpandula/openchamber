@@ -39,7 +39,6 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
     } }),
   });
   const nativeIndex = new Map();
-  const registeredDirectories = new Set();
   const indexWrites = new Map();
   async function syncNativeSession(session, isCurrent = () => true) {
     const previous = indexWrites.get(session.id) || Promise.resolve();
@@ -54,26 +53,27 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
       try { native = await client().session.get({ sessionID: session.id }); }
       catch (error) { if (!isSessionNotFoundError(error)) throw error; }
       if (!native) native = await client().session.create({ id: session.id, title: session.title,
-        location: { directory: session.directory }, metadata: { openchamberBackend: 'deepseek', openchamberDeepSeekModel: modelId, openchamberDeepSeekUpdatedAt: session.time.updated } });
+        location: { directory: session.directory }, metadata: { openchamberBackend: 'deepseek', openchamberDeepSeekModel: modelId, openchamberDeepSeekUpdatedAt: session.time.updated, openchamberDeepSeekBlank: session.blank, openchamberDeepSeekWorkspace: session.workspace || { kind: 'ungrouped', order: session.sidebarOrder } } });
       nativeIndex.set(session.id, native);
     }
-    if (native.title !== session.title || native.metadata?.openchamberDeepSeekUpdatedAt !== session.time.updated) {
+    if (native.title !== session.title || native.metadata?.openchamberDeepSeekUpdatedAt !== session.time.updated || native.metadata?.openchamberDeepSeekBlank !== session.blank || JSON.stringify(native.metadata?.openchamberDeepSeekWorkspace) !== JSON.stringify(session.workspace || { kind: 'ungrouped', order: session.sidebarOrder })) {
       await client().session.update({ sessionID: session.id, title: session.title });
-      await updateMetadata?.(session.id, { openchamberDeepSeekUpdatedAt: session.time.updated });
-      nativeIndex.set(session.id, { ...native, title: session.title, metadata: { openchamberDeepSeekUpdatedAt: session.time.updated } });
+      await updateMetadata?.(session.id, { openchamberDeepSeekUpdatedAt: session.time.updated, openchamberDeepSeekBlank: session.blank, openchamberDeepSeekWorkspace: session.workspace || { kind: 'ungrouped', order: session.sidebarOrder } });
+      nativeIndex.set(session.id, { ...native, title: session.title, metadata: { openchamberDeepSeekUpdatedAt: session.time.updated, openchamberDeepSeekBlank: session.blank, openchamberDeepSeekWorkspace: session.workspace || { kind: 'ungrouped', order: session.sidebarOrder } } });
     }
-    if (registerProject && !registeredDirectories.has(session.directory)) {
+    if (registerProject && session.workspace) {
+      const directory = session.workspace.path;
       let added = false;
       await registerProject((projects) => {
-        const existing = projects.filter((project) => {
-          const relative = path.relative(project.path, session.directory);
-          return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
-        }).sort((a, b) => b.path.length - a.path.length)[0];
-        if (existing) return existing;
+        const existing = projects.find((project) => project.path === directory);
+        if (existing) {
+          if (existing.label === session.workspace.title) return existing;
+          added = true;
+          return { ...existing, label: session.workspace.title };
+        }
         added = true;
-        return { id: createProjectIdFromPath(session.directory), path: session.directory, label: path.basename(session.directory), addedAt: Date.now(), lastOpenedAt: Date.now() };
+        return { id: createProjectIdFromPath(directory), path: directory, label: session.workspace.title, addedAt: Date.now(), lastOpenedAt: Date.now() };
       });
-      registeredDirectories.add(session.directory);
       if (added) onProjectsChanged();
     }
   }

@@ -1,3 +1,4 @@
+import { asNonEmptyString } from '../shared/guards.js';
 import { createProjectIdFromPath, projectConfigFileStemOf } from '../projects/project-id.js';
 import {
   buildPreferencesFields,
@@ -1241,8 +1242,12 @@ export const createSettingsRuntime = (deps) => {
       }
       const projects = sanitizeProjects(current.projects) || [];
       const project = await resolveProject(projects);
-      if (!projects.some((entry) => entry.id === project.id)) {
-        await writeJsonFileAtomic(SETTINGS_FILE_PATH, JSON.stringify({ ...current, projects: [...(current.projects || []), project] }, null, 2));
+      const next = [...(current.projects || [])];
+      const index = next.findIndex((entry) => asNonEmptyString(entry?.id) === project.id);
+      if (index < 0) next.push(project);
+      else next[index] = { ...next[index], ...project };
+      if (JSON.stringify(next) !== JSON.stringify(current.projects || [])) {
+        await writeJsonFileAtomic(SETTINGS_FILE_PATH, JSON.stringify({ ...current, projects: next }, null, 2));
       }
       return project;
     });

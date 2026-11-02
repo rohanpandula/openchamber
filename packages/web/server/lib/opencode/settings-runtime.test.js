@@ -8,6 +8,7 @@ import { createSettingsRuntime } from './settings-runtime.js';
 
 const createRuntime = async ({
   mergePersistedSettings = (_current, changes) => changes,
+  sanitizeProjects = (projects) => Array.isArray(projects) ? projects : [],
   onManagedPluginSettingsChanged = undefined,
   onPermissionDefaultModeChanged = undefined,
   onLastDirectoryChanged = undefined,
@@ -21,7 +22,7 @@ const createRuntime = async ({
     path,
     crypto,
     SETTINGS_FILE_PATH: settingsFilePath,
-    sanitizeProjects: (projects) => Array.isArray(projects) ? projects : [],
+    sanitizeProjects,
     sanitizeSettingsUpdate: (settings) => settings,
     mergePersistedSettings,
     normalizeSettingsPaths: (settings) => ({ settings, changed: false }),
@@ -61,6 +62,24 @@ describe('settings runtime', () => {
       const stored = JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8'));
       expect(stored.projects).toEqual([{ id: kept, path: '/kept', label: 'Kept' }, { id: added, path: '/new' }]);
       expect(stored).toMatchObject({ activeProjectId: kept, lastDirectory: '/kept', future: 42, lightThemeId: 'test' });
+    } finally { await cleanup(); }
+  });
+
+  it('updates a registered workspace label without losing project or navigation fields', async () => {
+    const { runtime, settingsFilePath, cleanup } = await createRuntime();
+    try {
+      await fsPromises.writeFile(settingsFilePath, JSON.stringify({ projects: [{ id: 'project', path: '/repo', label: 'Old', color: '#123456' }], activeProjectId: 'project', lastDirectory: '/repo' }));
+      await runtime.registerSessionProject((projects) => ({ ...projects[0], label: 'Renamed' }));
+      expect(JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8'))).toEqual({ projects: [{ id: 'project', path: '/repo', label: 'Renamed', color: '#123456' }], activeProjectId: 'project', lastDirectory: '/repo' });
+    } finally { await cleanup(); }
+  });
+
+  it('upserts by raw ID when sanitization omits earlier entries', async () => {
+    const { runtime, settingsFilePath, cleanup } = await createRuntime({ sanitizeProjects: (entries) => entries.filter(Boolean) });
+    try {
+      await fsPromises.writeFile(settingsFilePath, JSON.stringify({ projects: [null, { id: 'p', path: '/repo', label: 'Old' }] }));
+      await runtime.registerSessionProject((projects) => ({ ...projects[0], label: 'New' }));
+      expect(JSON.parse(await fsPromises.readFile(settingsFilePath, 'utf8')).projects).toEqual([null, { id: 'p', path: '/repo', label: 'New' }]);
     } finally { await cleanup(); }
   });
 
@@ -420,7 +439,7 @@ describe('settings runtime', () => {
       path,
       crypto,
       SETTINGS_FILE_PATH: settingsFilePath,
-      sanitizeProjects: (projects) => Array.isArray(projects) ? projects : [],
+      sanitizeProjects,
       sanitizeSettingsUpdate: (settings) => settings,
       mergePersistedSettings: (_current, changes) => changes,
       normalizeSettingsPaths: (settings) => ({ settings, changed: false }),

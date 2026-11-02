@@ -491,6 +491,7 @@ export const dict = {
   'sessions.sidebar.empty.noMatches.description': 'Essayez un autre titre, branche, dossier ou chemin.',
   'sessions.sidebar.empty.noMatches.searchArchive': 'Rechercher dans les archives',
   'sessions.sidebar.activity.chatsTitle': 'Discussions',
+  'sessions.sidebar.activity.ungroupedTitle': 'Non groupées',
   'sessions.sidebar.activity.chatsEmpty': 'Aucune discussion pour le moment.',
   'chat.chatInput.chooseProject': 'Choisir un projet',
   'sessions.sidebar.header.projectDisplay.label': 'Afficher les projets',

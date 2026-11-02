@@ -666,6 +666,7 @@ export const dict: Record<I18nKey, string> = {
   "sessions.sidebar.empty.noMatches.description": "Inténtalo con un título, rama, carpeta o ruta diferente.",
   "sessions.sidebar.empty.noMatches.searchArchive": "Buscar en el archivo",
   "sessions.sidebar.activity.chatsTitle": "Chats",
+  'sessions.sidebar.activity.ungroupedTitle': 'Sin agrupar',
   "sessions.sidebar.activity.chatsEmpty": "Aún no hay chats.",
   "chat.chatInput.chooseProject": "Elegir proyecto",
   "sessions.sidebar.header.projectDisplay.label": "Mostrar proyectos",

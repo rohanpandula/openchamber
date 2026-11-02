@@ -32,7 +32,7 @@ import type { SessionTreeItemProps } from '../sessions/SessionTreeItem';
 import { useArchivedAutoFolders } from '../folders/useArchivedAutoFolders';
 import { ProjectSessionSelectionEffect } from '../projects/useProjectSessionSelection';
 import type { WorktreeMetadata } from '@/types/worktree';
-import { buildActiveSessionNode, useSessionProjectCollection } from './sessionCollection';
+import { buildActiveSessionNode, isSidebarChat, useSessionProjectCollection } from './sessionCollection';
 import { useChildStoreManager } from '@/sync/sync-context';
 import { useGlobalSyncStore } from '@/sync/global-sync-store';
 import { createSessionOwnershipIndex } from '../sessions/sessionOwnership';
@@ -50,6 +50,7 @@ import { resolveSidebarGrouping, useSessionDisplayStore } from '@/stores/useSess
 import { holdOrder, rankByLatestActivity } from './projectSort';
 import type { DeleteSessionConfirmState } from '../sessions/useSessionActions';
 import { useExpandedParents } from '../sessions/useExpandedParents';
+import { deepSeekWorkspace } from '@/lib/sessionDeepSeekWorkspace';
 import { getChatsRootFromDirectory, isChatDirectoryPath } from '@/lib/chatDirectories';
 import { useChatsRoot } from '@/hooks/useChatsRoot';
 import { isVSCodeWithoutWorkspace } from '@/lib/vscodeBootstrap';
@@ -318,7 +319,7 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
       .map((directory) => ({ scopeKey: directory, directory }));
     return {
       id: 'managed-chats',
-      label: '',
+      label: collection.chatSessions.some((session) => deepSeekWorkspace(session) === null) ? t('sessions.sidebar.activity.ungroupedTitle') : '',
       branch: null,
       description: null,
       isMain: true,
@@ -331,11 +332,11 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
         .filter((session) => !session.time?.archived && !collection.nestedSessionIds.has(session.id))
         .map((session) => buildActiveSessionNode(collection.childrenMap, session)),
     };
-  }, [collection.chatSessions, collection.childrenMap, collection.nestedSessionIds, knownChatsRoot, topology.isVSCode]);
+  }, [collection.chatSessions, collection.childrenMap, collection.nestedSessionIds, knownChatsRoot, t, topology.isVSCode]);
   const archivedChatGroup = React.useMemo<SessionGroup | null>(() => {
     if (!chatGroup || !topology.isVSCode || !view.showInlineArchived) return null;
     const sessions = collection.archivedSessions
-      .filter((session) => isChatDirectoryPath(session.directory) && !session.parentID)
+      .filter((session) => isSidebarChat(session) && !session.parentID)
       .map((session) => ({ session, children: [], worktree: null }));
     if (sessions.length === 0) return null;
     return { ...chatGroup, id: 'managed-chats-archived', label: t('sessions.sidebar.grouping.archived'), isMain: false, isArchivedBucket: true, directory: null, folderScopeKey: null, sessions, folderScopes: [] };
@@ -543,7 +544,7 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
     const pinnedSessions = showPinned
       ? collection.orderedSessions.filter((session) => rootSessionIds.has(session.id)
         && !session.time?.archived
-        && !isChatDirectoryPath(session.directory)
+        && !isSidebarChat(session)
         && isSessionPinned(collection.pinnedSessionIds, session.directory, session.id)
         && (getSessionPinList(session) ?? DEFAULT_PIN_LIST) === DEFAULT_PIN_LIST)
       : [];
@@ -583,7 +584,7 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
     let all: SidebarWorkRef[] = [];
     if (customTimeSections) {
       all = orderSidebarWorks(collection.orderedSessions, workIndex, (session) => (
-        !session.time?.archived && !isChatDirectoryPath(session.directory)
+        !session.time?.archived && !isSidebarChat(session)
       ), worktreeArchiveAnchors);
       const seen = new Set(all.map((ref) => ref.key));
       const unstarted = workIndex.groupWorks.filter((ref) => !seen.has(ref.key));
@@ -653,7 +654,7 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
   }, [toggleGroup, toggleWork, worktreeWorkKeys]);
   const workSessions = React.useMemo(
     () => zoneWorks.work.length === 0 ? [] : collection.orderedSessions.filter((session) => (
-      !session.parentID && !session.time?.archived && !isChatDirectoryPath(session.directory) && isSessionInWork(session)
+      !session.parentID && !session.time?.archived && !isSidebarChat(session) && isSessionInWork(session)
     )),
     [collection.orderedSessions, zoneWorks.work.length],
   );
@@ -744,7 +745,7 @@ const VisibleSessionProjects: React.FC<SessionProjectCollectionProps> = ({ topol
     if (view.hasSessionSearchQuery) for (const key of membership.listedKeys) listedKeys.add(key);
     const inClaimedProject = (projectId: string | null): boolean => projectId !== null && membership.claimedProjectIds.has(projectId);
     const refs = orderSidebarWorks(collection.orderedSessions, workIndex, (session) => (
-      !session.time?.archived && !isChatDirectoryPath(session.directory)
+      !session.time?.archived && !isSidebarChat(session)
     ), worktreeArchiveAnchors).filter((ref) => !listedKeys.has(ref.key) && !inClaimedProject(ref.projectId));
     const seen = new Set(refs.map((ref) => ref.key));
     // Works nobody has started a session in: worktrees close the list, spaces

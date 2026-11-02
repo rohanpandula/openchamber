@@ -342,3 +342,12 @@ opencodeClient.getFilesystemHomeInfo = async () => ({
 });
 await ensureChatsRootDirectory();
 opencodeClient.getFilesystemHomeInfo = originalHomeInfo;
+
+test('Harness ungrouped chats do not become filesystem projects', () => {
+  const loose = { ...session('loose', '/tmp/task'), metadata: { openchamberDeepSeekWorkspace: { kind: 'ungrouped' } } };
+  const assigned = { ...session('assigned', '/tmp/task'), metadata: { openchamberDeepSeekWorkspace: { id: 'w', path: '/project', title: 'Project' } } };
+  const result = partitionSidebarSessions([loose, assigned], false);
+  expect(result.chatSessions.map(s => s.id)).toEqual(['loose']);
+  expect(result.projectSessions.map(s => s.id)).toEqual(['assigned']);
+  expect(projectSidebarActiveSessions({ globalActiveSessions: [assigned], liveSessions: [], knownDirectories: new Set(['/project']), isVSCode: false }).map(s => s.id)).toEqual(['assigned']);
+});

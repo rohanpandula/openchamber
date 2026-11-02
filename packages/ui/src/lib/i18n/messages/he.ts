@@ -604,6 +604,7 @@ export const dict = {
   'sessions.sidebar.empty.noMatches.description': 'אפשר לנסות כותרת, ענף, תיקייה או נתיב אחרים.',
   'sessions.sidebar.empty.noMatches.searchArchive': 'חפש בארכיון',
   'sessions.sidebar.activity.chatsTitle': 'צ\'אטים',
+  'sessions.sidebar.activity.ungroupedTitle': 'ללא קבוצה',
   'sessions.sidebar.activity.chatsEmpty': 'אין עדיין צ\'אטים.',
   'chat.chatInput.chooseProject': 'בחר פרויקט',
   'sessions.sidebar.header.projectDisplay.label': 'הצג פרויקטים',

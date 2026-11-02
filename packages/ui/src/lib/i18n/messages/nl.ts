@@ -656,6 +656,7 @@ export const dict = {
   'sessions.sidebar.empty.noMatches.description': 'Probeer een andere titel, branch, map of pad.',
   'sessions.sidebar.empty.noMatches.searchArchive': 'Zoeken in het archief',
   'sessions.sidebar.activity.chatsTitle': 'Gesprekken',
+  'sessions.sidebar.activity.ungroupedTitle': 'Niet gegroepeerd',
   'sessions.sidebar.activity.chatsEmpty': 'Nog geen gesprekken.',
   'chat.chatInput.chooseProject': 'Kies project',
   'sessions.sidebar.header.projectDisplay.label': 'Projecten tonen',

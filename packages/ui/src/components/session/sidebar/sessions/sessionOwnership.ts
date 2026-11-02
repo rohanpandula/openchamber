@@ -1,5 +1,6 @@
 import type { Project as OpenCodeProject, Session } from '@/lib/opencode/model';
 import { getNormalizedParentDirectory, normalizePath } from '@/lib/pathNormalization';
+import { deepSeekWorkspace } from '@/lib/sessionDeepSeekWorkspace';
 import type { SpaceMark } from '@/lib/spaces/spaces-store';
 
 type Project = {
@@ -217,7 +218,9 @@ export const createSessionOwnershipIndex = (
     scopeTarget?: Map<string, Set<string>>,
   ): void => {
     for (const session of input) {
-      const exactOwner = resolveOwner(resolveSessionDirectory(session));
+      const workspace = !isVSCode ? deepSeekWorkspace(session) : undefined;
+      if (workspace === null) continue;
+      const exactOwner = resolveOwner(workspace?.path ?? resolveSessionDirectory(session));
       const owner = exactOwner ?? (!isVSCode
         ? canonicalOwnerByOpenCodeProjectId.get(getOpenCodeProjectId(session) ?? '') ?? null
         : null);

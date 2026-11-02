@@ -27,6 +27,9 @@ Harness chats retain their own runtime and model selection.
 
 - Harness is authoritative for shared chat history, titles and running status.
   OpenCode holds index records so existing sidebar pagination and folders work.
+  Workspace membership and row order come from `workspace/follow`; cwd stays
+  the execution directory, never the grouping authority. Unassigned chats use
+  the Ungrouped list, and blank drafts stay out of the sidebar.
   Only root chats are indexed; `origin: subagent` records remain in their parent
   chat's tool output. Ordinary forks remain distinct chats.
 - Host IDs map deterministically to native IDs. Legacy ACP bindings retain their
@@ -34,7 +37,8 @@ Harness chats retain their own runtime and model selection.
   ACP as a fallback for a disconnected shared chat.
 - Index failures retry without clearing successful rows. Index metadata writes
   use the existing serialized metadata store, preserving concurrent user edits.
-  Project registration appends through the settings write queue without changing
+  Project registration upserts exact Harness workspace paths and labels through
+  the settings write queue without changing
   the active project. Clients refresh settings after a new project is added.
 - Shared history never resumes a second agent. Requested subscriptions survive
   host reconnects. Old generations and replaced subscriptions cannot publish

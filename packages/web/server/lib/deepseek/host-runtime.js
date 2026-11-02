@@ -5,9 +5,10 @@ import { createHostTranscript, hostEventSchema, hostSessionID, fromHostSessionID
 
 const rowSchema = z.object({
   sessionId: z.string().min(1), updatedAt: z.number(), running: z.boolean(),
-  cwd: z.string().refine(path.isAbsolute, 'Expected an absolute Harness directory').optional(), origin: z.string().optional(),
+  blank: z.boolean().optional(), cwd: z.string().refine(path.isAbsolute, 'Expected an absolute Harness directory').optional(), origin: z.string().optional(),
   projections: z.object({ values: z.record(z.string(), z.unknown()) }).optional(),
 });
+const workspaceStateSchema = z.object({ items: z.array(z.object({ workspaceId: z.string(), path: z.string().refine(path.isAbsolute), title: z.string(), sessionIds: z.array(z.string()) })), archivedSessionIds: z.array(z.string()), pinnedSessionIds: z.array(z.string()) });
 const snapshotSchema = z.object({
   type: z.literal('snapshot'), cursor: z.number(), hasMore: z.boolean(),
   records: z.array(z.object({ event: hostEventSchema })),
@@ -30,14 +31,20 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
   let refreshAgain = false;
   let generation = 0;
   let sessionBindings;
+  let workspaceState;
+  let workspaceCancel;
+  let workspaceRevision = 0;
   const nativeID = (id) => sessionBindings?.get(id) || hostSessionID(id);
   const connection = connectionFactory({
     file,
     onError,
-    onReady: () => refresh(),
+    onReady: async () => { await followWorkspaces(); await refresh(); },
     onDisconnect: () => {
       generation++;
       initialized = false;
+      workspaceRevision++;
+      workspaceState = undefined;
+      workspaceCancel?.();
       for (const history of histories.values()) history.cancel?.();
       histories.clear();
       clearTimeout(indexRetry);
@@ -64,6 +71,24 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
     },
   });
 
+  async function followWorkspaces() {
+    const revision = ++workspaceRevision;
+    workspaceCancel?.();
+    return new Promise((resolve, reject) => {
+      workspaceCancel = connection.stream('workspace/follow', {}, (frame) => {
+        if (revision !== workspaceRevision || stopped) return;
+        if (frame?.type === 'baseline' || frame?.type === 'replace') {
+          workspaceState = workspaceStateSchema.parse(frame.value);
+          resolve();
+          if (initialized) void refresh().catch(onError);
+        } else {
+          // Navigation changes are infrequent; reopen for the authoritative complete projection.
+          void followWorkspaces().catch(onError);
+        }
+      }, (error) => { reject(error); if (revision === workspaceRevision && !stopped) connection.reconnect(); });
+    });
+  }
+
   async function refresh() {
     if (refreshPromise && refreshGeneration === generation) { refreshAgain = true; return refreshPromise; }
     const current = generation;
@@ -75,14 +100,19 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
         const result = z.object({ items: z.array(rowSchema) }).parse(await connection.call('session/list', { _request: {} }));
         if (current !== generation || stopped) return;
         let indexFailed = false;
+        const memberships = new Map();
+        for (const workspace of workspaceState.items) for (const id of workspace.sessionIds) memberships.set(id, workspace);
         for (const row of [...result.items].sort((a, b) => a.updatedAt - b.updatedAt)) {
           if (current !== generation || stopped) return;
           if (row.origin === 'subagent' || !row.cwd) continue;
           const values = row.projections?.values || {};
           const id = nativeID(row.sessionId);
           const previous = sessions.get(id);
+          const workspace = memberships.get(row.sessionId);
           const session = { id, hostID: row.sessionId, directory: row.cwd, title: z.string().safeParse(values.title).data || 'DeepSeek session',
-            time: { created: previous?.time.created || row.updatedAt, updated: row.updatedAt }, running: row.running };
+            time: { created: previous?.time.created || row.updatedAt, updated: row.updatedAt }, running: row.running,
+            workspace: workspace ? { id: workspace.workspaceId, path: workspace.path, title: workspace.title, order: workspace.sessionIds.indexOf(row.sessionId) } : null,
+            sidebarOrder: -Number(values.sessionListMetadata?.lastPromptAt || row.updatedAt), blank: row.blank === true };
           sessions.set(id, session);
           try { await onSession(session, () => current === generation && !stopped); } catch (error) { indexFailed = true; onError(error); continue; }
           if (current !== generation || stopped) return;
@@ -172,7 +202,11 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
     async getMessages({ sessionID }) { await ready(); return (await historyFor(sessionID)).records(); },
     async createSession(input) {
       await ready();
-      const created = z.object({ sessionId: z.string() }).parse(await connection.call('session/create', { request: { cwd: input.directory, sessionId: input.id } }));
+      const workspace = workspaceState.items.find((item) => item.path === input.directory);
+      const request = { sessionId: input.id };
+      if (workspace) request.workspaceId = workspace.workspaceId;
+      else request.cwd = input.directory;
+      const created = z.object({ sessionId: z.string() }).parse(await connection.call('session/create', { request }));
       if (model && provider) await connection.call('session/selectModel', { request: { sessionId: created.sessionId, provider, model } });
       if (input.title) await connection.call('session/rename', { request: { sessionId: created.sessionId, title: input.title } });
       await refresh();

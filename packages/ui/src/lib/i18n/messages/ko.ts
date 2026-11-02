@@ -657,6 +657,7 @@ export const dict: Record<I18nKey, string> = {
   'sessions.sidebar.empty.noMatches.description': '다른 제목, 브랜치, 폴더 또는 경로로 검색해 보세요.',
   'sessions.sidebar.empty.noMatches.searchArchive': '보관함에서 검색',
   'sessions.sidebar.activity.chatsTitle': '채팅',
+  'sessions.sidebar.activity.ungroupedTitle': '그룹 없음',
   'sessions.sidebar.activity.chatsEmpty': '아직 채팅이 없습니다.',
   'chat.chatInput.chooseProject': '프로젝트 선택',
   'sessions.sidebar.header.projectDisplay.label': '프로젝트 표시',

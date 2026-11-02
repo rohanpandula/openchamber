@@ -1309,3 +1309,11 @@ starts, after failure, during shutdown, or for external OpenCode. Restart clears
 the previous result, and readers discard results from a replaced preflight.
 This checks CLI compatibility, not server health; the normal startup flow still
 owns connection readiness. Explicit user compatibility checks remain fresh.
+
+## Background workspace registration
+
+`registerSessionProject` resolves a project inside the settings write queue. It
+appends new IDs or merges the resolved fields into that same existing ID, leaving
+other project fields, projects, and active navigation unchanged. Harness workspace
+label changes use this path; ordinary directory adoption returns the existing
+entry unchanged.

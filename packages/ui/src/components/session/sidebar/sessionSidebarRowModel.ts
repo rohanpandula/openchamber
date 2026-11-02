@@ -986,7 +986,7 @@ export const buildSessionSidebarRowModel = (args: SessionSidebarRowModelArgs): S
   const appendChats = (): void => {
     if (!args.chatGroup) return;
     if (search && groupSearchMatches(args.chatGroup) === 0 && !(args.archivedChatGroup && groupSearchMatches(args.archivedChatGroup) > 0)) return;
-    const collapsed = appendActivityHeader('chats');
+    const collapsed = args.chatGroup.label ? appendActivityHeader('chats', { label: args.chatGroup.label, preview: false }) : appendActivityHeader('chats');
     if (collapsed) return;
     // Chats are one-line rows with the tree's state slot, on a short page
     // that pinned chats do not spend.

@@ -303,3 +303,12 @@ describe('createSessionOwnershipIndex', () => {
   });
 });
 
+
+test('Harness workspace membership overrides cwd without changing the execution directory', () => {
+  const assigned = { ...ownershipSession('assigned', { directory: '/elsewhere/task' }), metadata: { openchamberDeepSeekWorkspace: { id: 'w', path: '/project', title: 'Project' } } };
+  const ungrouped = { ...ownershipSession('ungrouped', { directory: '/project' }), metadata: { openchamberDeepSeekWorkspace: { kind: 'ungrouped' } } };
+  const result = createSessionOwnershipIndex([assigned, ungrouped], [{ id: 'p', normalizedPath: '/project' }], new Map(), false);
+  expect(result.bySessionId.get('assigned')?.projectId).toBe('p');
+  expect(result.bySessionId.has('ungrouped')).toBe(false);
+  expect(assigned.directory).toBe('/elsewhere/task');
+});

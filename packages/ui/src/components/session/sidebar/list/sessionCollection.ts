@@ -11,6 +11,7 @@ import { useSessionPinnedStore } from '@/stores/useSessionPinnedStore';
 import { resolveGlobalSessionDirectory } from '@/stores/useGlobalSessionsStore';
 import { normalizePath } from '../utils';
 import { isChatDirectoryPath } from '@/lib/chatDirectories';
+import { deepSeekWorkspace, orderDeepSeekWorkspaceSessions } from '@/lib/sessionDeepSeekWorkspace';
 import { isVSCodeWithoutWorkspace } from '@/lib/vscodeBootstrap';
 import { isSpaceDirectory } from '@/lib/spaces/space-route';
 import { isBtwSession } from '@/lib/sessionBtwMetadata';
@@ -39,6 +40,11 @@ const nestingParentResolver = (sessionById: ReadonlyMap<string, Session>) => (
 
 // This boundary owns session visibility before Recent or projects take
 // ownership. Temporary /btw forks never leak into any sidebar projection.
+export function isSidebarChat(session: Session): boolean {
+  const workspace = deepSeekWorkspace(session);
+  return workspace === null || (workspace === undefined && isChatDirectoryPath(session.directory));
+}
+
 export const partitionSidebarSessions = (
   sessions: readonly Session[],
   isVSCode: boolean,
@@ -47,8 +53,8 @@ export const partitionSidebarSessions = (
   const chatSessions: Session[] = [];
   const excludeChats = isVSCode && !isVSCodeWithoutWorkspace();
   for (const session of sessions) {
-    if (isBtwSession(session)) continue;
-    if (isChatDirectoryPath(session.directory)) {
+    if (isBtwSession(session) || session.metadata?.openchamberDeepSeekBlank === true) continue;
+    if (isSidebarChat(session)) {
       if (excludeChats) continue;
       chatSessions.push(session);
       continue;
@@ -66,7 +72,7 @@ const isKnownActiveSessionDirectory = (
 ): boolean => {
   // Filtering this projection never removes records from the global cache.
   // Unregistered destinations are assessed and registered by session admission.
-  const normalized = normalizePath(resolveGlobalSessionDirectory(session));
+  const normalized = normalizePath(deepSeekWorkspace(session)?.path ?? resolveGlobalSessionDirectory(session));
   const directory = isVSCode ? normalized?.toLowerCase() : normalized;
   if (!directory) return false;
   if (!isVSCode && isSpaceDirectory(directory)) return true;
@@ -199,12 +205,12 @@ const orderSidebarSessionStructure = (
   pinnedSessionIds: Set<string>,
   sessionOrderRanks: ReadonlyMap<string, number>,
 ) => {
-  const orderedSessions = orderSessionsByLifecycleScopes(
+  const orderedSessions = orderDeepSeekWorkspaceSessions(orderSessionsByLifecycleScopes(
     structure.sessions,
     pinnedSessionIds,
     sessionOrderRanks,
     structure.hierarchy,
-  );
+  ), pinnedSessionIds);
   const childrenMap = new Map<string, Session[]>();
   const nestingParentOf = nestingParentResolver(structure.sessionById);
   for (const session of orderedSessions) {

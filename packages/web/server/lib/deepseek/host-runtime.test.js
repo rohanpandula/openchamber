@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createSharedHostRuntime } from './host-runtime.js';
 
+const workspaceStream = (_method, _args, receive) => { receive({ type: 'baseline', value: { items: [], archivedSessionIds: [], pinnedSessionIds: [] } }); return () => {}; };
 const row = (sessionId, extra = {}) => ({ sessionId, cwd: '/tmp', updatedAt: 1, running: false, ...extra });
 
 describe('shared Harness session membership', () => {
@@ -9,7 +10,7 @@ describe('shared Harness session membership', () => {
     const calls = [];
     const runtime = createSharedHostRuntime({ file: 'unused', publishEvent: () => {}, onStatus: () => {}, onSession: async (s) => indexed.push(s),
       connectionFactory: (options) => ({
-        start() { queueMicrotask(() => options.onReady()); }, isReady: () => true, stop() {},
+        start() { queueMicrotask(() => options.onReady()); }, isReady: () => true, stream: workspaceStream, stop() {},
         async call(method) { calls.push(method); return { items: [row('root'), row('child', { origin: 'subagent', parentSessionId: 'root' }), row('fork', { parentSessionId: 'root' })] }; },
       }),
     });
@@ -24,7 +25,7 @@ describe('shared Harness session membership', () => {
     const errors = [];
     const runtime = createSharedHostRuntime({ file: 'unused', publishEvent: () => {}, onStatus: () => {}, onError: (e) => errors.push(e.message),
       onSession: async (s) => { if (s.hostID === 'bad') throw Error('cannot index'); indexed.push(s.hostID); },
-      connectionFactory: (options) => ({ start() { queueMicrotask(() => options.onReady()); }, isReady: () => true, stop() {},
+      connectionFactory: (options) => ({ start() { queueMicrotask(() => options.onReady()); }, isReady: () => true, stream: workspaceStream, stop() {},
         async call() { return { items: [row('bad'), row('good')] }; },
       }),
     });
@@ -41,14 +42,14 @@ it('starts a fresh list after reconnect even while the old list is pending', asy
   const runtime = createSharedHostRuntime({ file: 'unused', publishEvent: () => {}, onStatus: () => {}, onSession: async (s) => indexed.push(s.hostID),
     connectionFactory: (options) => {
       callbacks = options;
-      return { start() {}, stop() {}, isReady: () => true,
+      return { start() {}, stop() {}, isReady: () => true, stream: workspaceStream,
         call() { calls++; return calls === 1 ? new Promise((resolve) => { finishOld = resolve; }) : Promise.resolve({ items: [row('new')] }); },
       };
     },
   });
   try {
     const old = callbacks.onReady();
-    await Promise.resolve();
+    while (!finishOld) await Promise.resolve();
     callbacks.onDisconnect();
     await callbacks.onReady();
     finishOld({ items: [row('stale')] });
@@ -62,7 +63,7 @@ it('reuses the native ID of a legacy ACP chat instead of importing a duplicate',
   const indexed = [];
   const runtime = createSharedHostRuntime({ file: 'unused', publishEvent: () => {}, onStatus: () => {}, onSession: async (session) => indexed.push(session.id),
     loadSessionBindings: async () => new Map([['old-host-id', 'ses_existing']]),
-    connectionFactory: (options) => ({ start() { queueMicrotask(() => options.onReady()); }, stop() {}, isReady: () => true,
+    connectionFactory: (options) => ({ start() { queueMicrotask(() => options.onReady()); }, stop() {}, isReady: () => true, stream: workspaceStream,
       async call() { return { items: [row('old-host-id')] }; },
     }),
   });
@@ -71,5 +72,20 @@ it('reuses the native ID of a legacy ACP chat instead of importing a duplicate',
     expect(indexed).toEqual(['ses_existing']);
     expect(runtime.owns('ses_existing')).toBe(true);
     expect((await runtime.getSession({ sessionID: 'ses_existing' })).hostID).toBe('old-host-id');
+  } finally { runtime.shutdownAll(); }
+});
+
+it('uses Harness workspace membership rather than a chat working directory', async () => {
+  const indexed = [];
+  const runtime = createSharedHostRuntime({ file: 'unused', publishEvent: () => {}, onStatus: () => {}, onSession: async (s) => indexed.push(s),
+    connectionFactory: (options) => ({ start() { queueMicrotask(() => options.onReady()); }, stop() {}, isReady: () => true,
+      stream(_method, _args, receive) { receive({ type: 'baseline', value: { items: [{ workspaceId: 'workspace', path: '/workspace', title: 'My workspace', sessionIds: ['member'] }], archivedSessionIds: [], pinnedSessionIds: [] } }); return () => {}; },
+      async call() { return { items: [row('member', { cwd: '/outside/tools' }), row('loose', { cwd: '/workspace' })] }; },
+    }),
+  });
+  try {
+    await runtime.getStatusSnapshot();
+    expect(indexed[0]).toMatchObject({ directory: '/outside/tools', workspace: { id: 'workspace', path: '/workspace', title: 'My workspace', order: 0 } });
+    expect(indexed[1].workspace).toBeNull();
   } finally { runtime.shutdownAll(); }
 });

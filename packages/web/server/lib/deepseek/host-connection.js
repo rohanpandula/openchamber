@@ -127,6 +127,7 @@ export function createHostConnection({ file, onReady, onDisconnect, onEvent, onE
     start() { if (!opening) opening = connect(); return opening; },
     call, stream,
     isReady: () => ready,
+    reconnect: () => socket?.close(),
     stop() { stopped = true; clearTimeout(retry); lifetime.abort(); socket?.close(); streams.clear(); },
   };
 }
