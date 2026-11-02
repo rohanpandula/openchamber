@@ -206,8 +206,8 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
         const offset = cursor ? ordered.findIndex((entry) => entry.id === cursor) + 1 : 0;
         if (cursor && offset === 0) return res.status(400).json({ error: 'Invalid message cursor' });
         const data = ordered.slice(offset, offset + limit);
-        const page = { data };
-        if (offset + limit < ordered.length) page.next = data.at(-1).id;
+        const page = { data, cursor: {} };
+        if (offset + limit < ordered.length) page.cursor.next = data.at(-1).id;
         return res.json(page);
       }
       if (req.method === 'GET' && suffix === '/permission') {

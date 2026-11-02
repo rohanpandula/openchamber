@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import express from 'express';
+import { OpenCode } from '@opencode/client';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -73,6 +74,12 @@ describe('DeepSeek routes on the current OpenCode API', () => {
     expect(messages.data[1].id).toBe(promptId);
     expect(messages.data[0].id > promptId).toBe(true);
     expect(messages.data[0].time.created >= messages.data[1].time.created).toBe(true);
+    const sdk = OpenCode.make({ baseUrl: f.url });
+    const first = await sdk.message.list({ sessionID: session.id, limit: 1 });
+    expect(first.cursor.next).toBe(messages.data[0].id);
+    const older = await sdk.message.list({ sessionID: session.id, limit: 1, cursor: first.cursor.next });
+    expect(older.data.map((message) => message.id)).toEqual([promptId]);
+    expect(older.cursor.next).toBeUndefined();
     expect(f.events.some((event) => event.payload.type === 'session.text.delta')).toBe(true);
     expect((await f.post(`/api/session/${session.id}/shell`, { command: 'echo nope' })).status).toBe(501);
   });

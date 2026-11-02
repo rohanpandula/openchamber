@@ -43,6 +43,8 @@ Harness chats retain their own runtime and model selection.
 - Shared history never resumes a second agent. Requested subscriptions survive
   host reconnects. Old generations and replaced subscriptions cannot publish
   late results. A broken stream is canceled and retried from a fresh baseline.
+- History pages return OpenCode’s `cursor` object, including on the last page;
+  clients use it to distinguish a complete transcript from another page.
 - User request IDs survive history conversion, allowing optimistic UI messages
   to reconcile. Text, tool calls and results retain their parent step identities.
 - The connection file is owned by this OS user, mode 0600, under a private
