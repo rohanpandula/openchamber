@@ -1132,6 +1132,20 @@ class OpencodeService {
     )
   }
 
+  async continueWithOpenCode(id: string, model: ModelSelection, directory?: string | null): Promise<Session> {
+    const response = await runtimeFetch(`/api/session/${encodeURIComponent(id)}/backend`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: `ses_${crypto.randomUUID()}`, model: toModelRef(model) }),
+    })
+    if (!response.ok) {
+      const error = await response.json().catch(() => null)
+      const parsed = z.object({ error: z.string() }).safeParse(error)
+      throw new Error(parsed.success ? parsed.data.error : "Could not switch conversation backend.")
+    }
+    const result = z.object({ id: z.string().startsWith("ses_") }).parse(await response.json())
+    return this.getSession(result.id, directory)
+  }
+
   async switchSessionModel(id: string, model: ModelSelection, directory?: string | null): Promise<void> {
     await call("session.switchModel", () => this.clientFor(directory).session.switchModel({ sessionID: id, model: toModelRef(model) }))
   }

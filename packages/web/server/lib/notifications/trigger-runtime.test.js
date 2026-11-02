@@ -11,8 +11,9 @@ import { translateWireEvent } from '../event-stream/translate-v2.js';
  * agent and model from the start, a user abort announces nothing, and an
  * active goal (which lives in OpenChamber's own metadata) silences the push.
  */
-const makeRuntime = ({ metadata = {}, settings = {}, isInAutoReview } = {}) => {
+const makeRuntime = ({ metadata = {}, settings = {}, isInAutoReview, interactiveVisible = true } = {}) => {
   const emitDesktopNotification = vi.fn(() => true);
+  const sendApnsToAllUiSessions = vi.fn(async () => undefined);
   const runtime = createNotificationTriggerRuntime({
     readSettingsFromDisk: async () => ({ nativeNotificationsEnabled: true, notificationMode: 'always', notifyOnCompletion: true, ...settings }),
     prepareNotificationLastMessage: async ({ message }) => message,
@@ -24,14 +25,14 @@ const makeRuntime = ({ metadata = {}, settings = {}, isInAutoReview } = {}) => {
     emitDesktopNotification,
     broadcastUiNotification: vi.fn(),
     sendPushToAllUiSessions: vi.fn(async () => undefined),
-    sendApnsToAllUiSessions: vi.fn(async () => undefined),
-    isAnyInteractiveClientVisible: () => true,
+    sendApnsToAllUiSessions,
+    isAnyInteractiveClientVisible: () => interactiveVisible,
     buildOpenCodeUrl: (path) => `http://opencode.test${path}`,
     getOpenCodeAuthHeaders: () => ({}),
     readSessionMetadata: async () => metadata,
     isInAutoReview,
   });
-  return { runtime, emitDesktopNotification };
+  return { runtime, emitDesktopNotification, sendApnsToAllUiSessions };
 };
 
 const stepStarted = (sessionID, id) => ({
@@ -46,6 +47,15 @@ const stepEnded = (sessionID, id) => ({
 const turnEnded = (sessionID) => ({ type: 'session.idle', properties: { sessionID } });
 
 describe('ready notification on v2 step events', () => {
+  it('sends phone push when no interactive client is visible despite stale desktop focus', async () => {
+    const { runtime, emitDesktopNotification, sendApnsToAllUiSessions } = makeRuntime({ settings: { notificationMode: 'hidden-only' }, interactiveVisible: false });
+    runtime.setGetIsWindowFocused(() => true);
+    await runtime.maybeSendPushForTrigger(stepStarted('ses_phone', 'msg_phone'));
+    await runtime.maybeSendPushForTrigger(turnEnded('ses_phone'));
+    expect(emitDesktopNotification).not.toHaveBeenCalled();
+    expect(sendApnsToAllUiSessions).toHaveBeenCalledTimes(1);
+  });
+
   it('announces the turn end with the agent and model of its last step', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { runtime, emitDesktopNotification } = makeRuntime();

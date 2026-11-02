@@ -15,7 +15,7 @@ const frameSchema = z.discriminatedUnion('type', [
 ]);
 
 // Credentials stay here, never in OpenChamber responses or event payloads.
-export function createHostConnection({ file, onReady, onDisconnect, onEvent, onError = () => {}, fetchImpl = fetch }) {
+export function createHostConnection({ file, onReady, onDisconnect, onEvent, onInteraction, onError = () => {}, fetchImpl = fetch }) {
   let socket;
   let endpoint;
   let cookie;
@@ -106,8 +106,10 @@ export function createHostConnection({ file, onReady, onDisconnect, onEvent, onE
             ready = true;
             Promise.resolve(onReady?.()).then(() => { failures = 0; }).catch((error) => { onError(error); current.close(); });
           } else if (event?.type === 'waterfall') {
-            // Leave interactive approvals with Harness until an OpenChamber handler claims them.
-            void call('$events/result', { clientId, eventId: event.eventId, outcome: { kind: 'next' } }).catch(() => current.close());
+            const respond = (outcome) => call('$events/result', { clientId, eventId: event.eventId, outcome });
+            void Promise.resolve(onInteraction?.(event, respond))
+              .then((handled) => handled || respond({ kind: 'next' }))
+              .catch(() => current.close());
           } else onEvent?.(event);
         }, () => current.close());
       });

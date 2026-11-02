@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { z } from 'zod';
 import { createHostConnection } from './host-connection.js';
+import { createHostQuestions } from './host-questions.js';
 import { createHostTranscript, hostEventSchema, hostSessionID, fromHostSessionID } from './host-transcript.js';
 
 const rowSchema = z.object({
@@ -19,6 +20,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 export function createSharedHostRuntime({ file, model, provider, publishEvent, onSession, onStatus, onError = () => {}, loadSessionBindings = async () => new Map(), connectionFactory = createHostConnection }) {
   const sessions = new Map();
   const histories = new Map();
+  const waitingInteractions = new Map();
   const wantedHistories = new Set();
   const historyRetries = new Map();
   const historyFailures = new Map();
@@ -35,11 +37,24 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
   let workspaceCancel;
   let workspaceRevision = 0;
   const nativeID = (id) => sessionBindings?.get(id) || hostSessionID(id);
+  const questions = createHostQuestions({ nativeID, getSession: (id) => sessions.get(id), publish: publishEvent, call: (...args) => connection.call(...args) });
   const connection = connectionFactory({
+    onInteraction: async (event, respond) => {
+      if (event.event !== 'user-questions/request') return false;
+      const token = Symbol();
+      waitingInteractions.set(event.eventId, token);
+      try {
+        await ready();
+        if (waitingInteractions.get(event.eventId) !== token) return true;
+        return questions.handle(event, respond);
+      } finally { if (waitingInteractions.get(event.eventId) === token) waitingInteractions.delete(event.eventId); }
+    },
     file,
     onError,
     onReady: async () => { await followWorkspaces(); await refresh(); },
     onDisconnect: () => {
+      questions.clear();
+      waitingInteractions.clear();
       generation++;
       initialized = false;
       workspaceRevision++;
@@ -53,6 +68,7 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
       historyRetries.clear();
     },
     onEvent(event) {
+      if (event?.type === 'cancel') { waitingInteractions.delete(event.eventId); questions.cancel(event.eventId); void refresh().catch(onError); return; }
       if (event?.type !== 'emit') return;
       if (event.event === 'api-session/status') {
         const [id, running] = event.args;
@@ -114,6 +130,7 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
             workspace: workspace ? { id: workspace.workspaceId, path: workspace.path, title: workspace.title, order: workspace.sessionIds.indexOf(row.sessionId) } : null,
             sidebarOrder: -Number(values.sessionListMetadata?.lastPromptAt || row.updatedAt), blank: row.blank === true };
           sessions.set(id, session);
+          questions.sync(session, values.userQuestions);
           try { await onSession(session, () => current === generation && !stopped); } catch (error) { indexFailed = true; onError(error); continue; }
           if (current !== generation || stopped) return;
           if (previous ? previous.running !== session.running : session.running) onStatus(session, session.running);
@@ -188,7 +205,10 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
         }
       }, fail);
       function accept(frame) {
-        if (frame?.type === 'event') transcript.accept(frame.event, true);
+        if (frame?.type === 'event') {
+          transcript.accept(frame.event, true);
+          if (frame.event.type === 'tool/result' || frame.event.type === 'user/message') void refresh().catch(onError);
+        }
         else if (frame?.type === 'assistant-stream') transcript.frame(frame.frame);
       }
     });
@@ -200,6 +220,30 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
     isAvailable: () => true,
     async getSession({ sessionID }) { await ready(); return sessions.get(sessionID) || null; },
     async getMessages({ sessionID }) { await ready(); return (await historyFor(sessionID)).records(); },
+    async getExportMessages({ sessionID }) {
+      await ready();
+      const session = sessions.get(sessionID);
+      const records = structuredClone((await historyFor(sessionID)).records());
+      const fileFor = async (block) => {
+        if (block.type !== 'image' || !block.attachment) throw new Error('This chat contains a file attachment that cannot be transferred to OpenCode yet. The original chat is unchanged.');
+        const result = z.object({ attachment: z.object({ mediaType: z.string().startsWith('image/'), name: z.string().optional() }), data: z.string() }).parse(await connection.call('session/attachment', { request: { sessionId: session.hostID, attachmentId: block.attachment.attachmentId } }));
+        return { type: 'file', mime: result.attachment.mediaType, filename: result.attachment.name, url: `data:${result.attachment.mediaType};base64,${result.data}` };
+      };
+      for (const record of records) {
+        for (const block of record.attachments || []) record.parts.push(await fileFor(block));
+        for (const part of record.parts) if (part.type === 'tool' && part.state.attachments?.length) {
+          part.state.exportContent = [];
+          for (const block of part.state.content) {
+            if (block.type === 'text') part.state.exportContent.push({ type: 'text', text: block.text || '' });
+            else if (block.type === 'image' || block.type === 'file') {
+              const file = await fileFor(block);
+              part.state.exportContent.push({ type: 'file', uri: file.url, mime: file.mime, name: file.filename });
+            }
+          }
+        }
+      }
+      return records;
+    },
     async createSession(input) {
       await ready();
       const workspace = workspaceState.items.find((item) => item.path === input.directory);
@@ -223,7 +267,9 @@ export function createSharedHostRuntime({ file, model, provider, publishEvent, o
     async updateSession({ sessionID, title }) { await ready(); await connection.call('session/rename', { request: { sessionId: sessions.get(sessionID)?.hostID || fromHostSessionID(sessionID), title } }); await refresh(); },
     async deleteSession() { throw new Error('Delete or archive shared Harness sessions in Harness.'); },
     async getStatusSnapshot() { await ready(); return { busySessions: [...sessions.values()].filter((s) => s.running).map((s) => s.id) }; },
+    async listPendingForms(directory) { await ready(); return questions.list(directory); },
+    async answerForm(sessionID, formID, answer, cancel) { await ready(); return questions.answer(sessionID, formID, answer, cancel); },
     async listPendingPermissions() { return []; },
-    shutdownAll() { stopped = true; clearTimeout(indexRetry); for (const timer of historyRetries.values()) clearTimeout(timer); historyRetries.clear(); connection.stop(); histories.clear(); },
+    shutdownAll() { stopped = true; questions.clear(); clearTimeout(indexRetry); for (const timer of historyRetries.values()) clearTimeout(timer); historyRetries.clear(); connection.stop(); histories.clear(); },
   };
 }

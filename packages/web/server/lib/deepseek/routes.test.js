@@ -28,6 +28,7 @@ async function fixture() {
     const info = { ...req.body, projectID: 'project_test', cost: 0, tokens: { input: 0, output: 0, reasoning: 0, cache: { read: 0, write: 0 } }, time: { created: 1, updated: 1 } };
     sessions.set(info.id, info); res.json({ data: info });
   });
+  native.post('/api/experimental/session/import', (req, res) => { sessions.set(req.body.info.id, req.body.info); res.json({ data: req.body.info }); });
   native.get('/api/session/active', (_req, res) => res.json({ data: {} }));
   native.get('/api/permission/request', (_req, res) => res.json({ data: [] }));
   native.get('/api/session/:id', (req, res) => res.json({ data: sessions.get(req.params.id) }));
@@ -82,6 +83,22 @@ describe('DeepSeek routes on the current OpenCode API', () => {
     expect(older.cursor.next).toBeUndefined();
     expect(f.events.some((event) => event.payload.type === 'session.text.delta')).toBe(true);
     expect((await f.post(`/api/session/${session.id}/shell`, { command: 'echo nope' })).status).toBe(501);
+  });
+  it('continues Harness history in OpenCode and preserves the original', async () => {
+    const f = await fixture();
+    const { data: session } = await (await f.create()).json();
+    await f.post(`/api/session/${session.id}/prompt`, { text: 'remember Blue' });
+    await eventually(() => f.events.some((event) => event.payload.type === 'session.execution.succeeded'));
+    const body = { id: 'ses_continued', model: { providerID: 'opencode', id: 'big-pickle' } };
+    const response = await f.post(`/api/session/${session.id}/backend`, body);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ id: body.id });
+    expect(f.sessions.get(body.id).metadata).toMatchObject({ openchamberBackend: 'opencode', openchamberHandoffFrom: session.id });
+    expect(f.sessions.has(session.id)).toBe(true);
+    expect((await f.post(`/api/session/${session.id}/backend`, body)).status).toBe(200);
+    expect((await f.post(`/api/session/${session.id}/backend`, { ...body, model: { ...body.model, id: 'other' } })).status).toBe(409);
+    process.env.OPENCHAMBER_ENTERPRISE_MODE = '1';
+    expect((await f.post(`/api/session/${session.id}/backend`, { ...body, id: 'ses_forbidden' })).status).toBe(403);
   });
   it('preserves the client-generated session id used by optimistic UI state', async () => {
     const f = await fixture();

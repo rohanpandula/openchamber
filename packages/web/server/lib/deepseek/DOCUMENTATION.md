@@ -56,9 +56,17 @@ Harness chats retain their own runtime and model selection.
   Stopping OpenChamber closes its peer, not the Harness process or its sessions.
 - Enterprise mode disables shared-host connection and DeepSeek execution. The
   existing HTTP authentication and trust gates remain in front of these routes.
-- Shared-host approvals and interactive questions remain in Harness. The bridge
-  delegates unhandled waterfalls rather than approving them. ACP permission
-  replies remain supported. Shared deletion is refused before native deletion.
+- Shared-host questions appear as OpenChamber forms. Only an explicit answer
+  reaches the owning Harness request; cancellation and reconnect remove stale
+  forms, and continued timed questions remain answerable. Approvals still stay
+  in Harness; unhandled waterfalls are delegated. ACP permission replies remain
+  supported. Shared deletion is refused before native deletion.
+- Selecting an OpenCode model copies the completed Harness conversation into
+  an OpenCode continuation, preserving the original. Import uses fresh ordered
+  message IDs to avoid global ID collisions, the real working directory, and
+  hydrated image bytes. Unsupported file attachments fail before import.
+  Active turns must finish before switching; pinned chats must open in the main
+  view first. Later OpenCode messages belong to that continuation.
 - OpenCode-specific forks, moves, shell turns, compaction and agent/skill
   attachments remain unsupported. The model picker advertises one configured
   model; upstream features are not promises of DeepSeek compatibility.
@@ -82,3 +90,11 @@ cookies or modifying the signed Harness application.
 OpenChamber's sidebar relies on OpenCode pagination and metadata. Stable index
 records preserve that contract, and binding old ACP identities prevents an
 existing chat from appearing again under a new imported ID.
+
+
+### Why a backend switch creates a continuation
+
+OpenCode cannot replace an existing session through its import API. A separate
+continuation preserves the source chat and its live Harness identity while the
+selected OpenCode provider receives the imported history. A failed import never
+removes the source; requests with the same continuation ID are idempotent.

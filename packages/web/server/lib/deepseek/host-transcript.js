@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const hostEventSchema = z.object({ type: z.string(), seq: z.number().int(), time: z.number(), data: z.unknown() });
 const dataSchema = z.record(z.string(), z.unknown());
-const blockSchema = z.object({ type: z.string(), text: z.string().optional(), id: z.string().optional(), name: z.string().optional(), arguments: z.string().optional() });
+const blockSchema = z.object({ type: z.string(), text: z.string().optional(), id: z.string().optional(), name: z.string().optional(), arguments: z.string().optional(), attachment: z.object({ attachmentId: z.string(), mediaType: z.string(), name: z.string().optional() }).passthrough().optional() });
 const contentSchema = z.array(blockSchema);
 const safeInput = (text) => { try { return JSON.parse(text || '{}'); } catch { return {}; } };
 export const hostSessionID = (id) => id.startsWith('ses_') ? id : `ses_dsh_host_${Buffer.from(id).toString('base64url')}`;
@@ -52,7 +52,7 @@ export function createHostTranscript({ sessionID, directory, publish = () => {} 
       const id = z.string().startsWith('msg_').safeParse(data.source?.rpcId).data || `msg_dsh_${Buffer.from(sessionID).toString('base64url')}_u${event.seq}`;
       const parts = contentSchema.parse(data.content).filter((b) => b.type === 'text').map((b, i) => ({ id: `${id}_${i}`, messageID: id, sessionID, type: 'text', text: b.text || '' }));
       const info = { id, sessionID, role: 'user', time: { created: event.time } };
-      records.set(id, { info, parts });
+      records.set(id, { info, parts, attachments: contentSchema.parse(data.content).filter((b) => b.type === 'image' || b.type === 'file') });
       emit('message.updated', { info, parts }, live);
     } else if (event.type === 'assistant/message') {
       const message = dataSchema.parse(data.message);
@@ -71,8 +71,9 @@ export function createHostTranscript({ sessionID, directory, publish = () => {} 
       const record = assistant(data, event.time, live);
       const part = record.parts.find((p) => p.type === 'tool' && p.callID === message.toolCallId);
       if (part) {
+        const attachments = contentSchema.parse(message.content).filter((b) => b.type === 'image' || b.type === 'file');
         const output = contentSchema.parse(message.content).map((b) => b.text || '').join('\n');
-        part.state = { ...part.state, status: message.isError ? 'error' : 'completed', output, error: message.isError ? output : undefined, time: { ...part.state.time, end: event.time } };
+        part.state = { ...part.state, status: message.isError ? 'error' : 'completed', output, attachments, content: contentSchema.parse(message.content), error: message.isError ? output : undefined, time: { ...part.state.time, end: event.time } };
         emit('message.part.updated', { part }, live);
       }
 

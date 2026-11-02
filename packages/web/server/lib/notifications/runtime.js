@@ -550,9 +550,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           return;
         }
 
-        if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) {
-          return;
-        }
+        const notifyLocally = settings.notificationMode === 'always' || !getIsWindowFocused?.();
 
         const now = Date.now();
         const lastAt = lastReadyNotificationAt.get(sessionId) ?? 0;
@@ -604,7 +602,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           console.warn('[Notification] Template resolution failed, using defaults:', error?.message || error);
         }
 
-        if (settings.nativeNotificationsEnabled) {
+        if (settings.nativeNotificationsEnabled && notifyLocally) {
           const notificationPayload = {
             title,
             body,
@@ -651,9 +649,7 @@ export const createNotificationTriggerRuntime = (deps) => {
         if (now - lastAt < PUSH_READY_COOLDOWN_MS) return;
         lastErrorNotificationAt.set(sessionId, now);
 
-        if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) {
-          return;
-        }
+        const notifyLocally = settings.notificationMode === 'always' || !getIsWindowFocused?.();
 
         const texts = notificationTexts(settings.locale);
         let title = texts.errorTitle;
@@ -688,7 +684,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           console.warn('[Notification] Error template resolution failed, using defaults:', error?.message || error);
         }
 
-        if (settings.nativeNotificationsEnabled) {
+        if (settings.nativeNotificationsEnabled && notifyLocally) {
           const notificationPayload = {
             title,
             body,
@@ -743,9 +739,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           return;
         }
 
-        if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) {
-          return;
-        }
+        const notifyLocally = settings.notificationMode === 'always' || !getIsWindowFocused?.();
 
         const { header, questionText } = ask;
         // An MCP elicitation belongs to the whole directory: OpenCode files it
@@ -781,7 +775,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           console.warn('[Notification] Question template resolution failed, using defaults:', error?.message || error);
         }
 
-        if (settings.nativeNotificationsEnabled) {
+        if (settings.nativeNotificationsEnabled && notifyLocally) {
           const notificationPayload = {
             kind: 'question',
             title,
@@ -884,9 +878,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           return;
         }
 
-        if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) {
-          return;
-        }
+        const notifyLocally = settings.notificationMode === 'always' || !getIsWindowFocused?.();
 
         const sessionTitle = payload.properties?.sessionTitle;
         const permissionText = typeof permission === 'string' && permission.length > 0 ? permission : '';
@@ -922,7 +914,7 @@ export const createNotificationTriggerRuntime = (deps) => {
           console.warn('[Notification] Permission template resolution failed, using defaults:', error?.message || error);
         }
 
-        if (settings.nativeNotificationsEnabled) {
+        if (settings.nativeNotificationsEnabled && notifyLocally) {
           const notificationPayload = {
             kind: 'permission',
             title,
@@ -1020,7 +1012,7 @@ export const createNotificationTriggerRuntime = (deps) => {
   const notifyAutoReviewEnded = async ({ sessionId, directory, status, error }) => {
     const settings = await readSettingsFromDisk();
     if (settings.notifyOnCompletion === false) return;
-    if (settings.notificationMode !== 'always' && getIsWindowFocused?.()) return;
+    const notifyLocally = settings.notificationMode === 'always' || !getIsWindowFocused?.();
     const texts = notificationTexts(settings.locale);
     const { title, body } = {
       clean: { title: texts.reviewCleanTitle, body: texts.reviewCleanBody },
@@ -1030,7 +1022,7 @@ export const createNotificationTriggerRuntime = (deps) => {
     }[status] ?? {};
     if (!title) return;
     const tag = `review-${sessionId}`;
-    if (settings.nativeNotificationsEnabled) {
+    if (settings.nativeNotificationsEnabled && notifyLocally) {
       const payload = { title, body, tag, kind: 'review', sessionId, directory, requireHidden: settings.notificationMode !== 'always' };
       const desktopNotificationDelivered = emitDesktopNotification(payload);
       broadcastUiNotification(payload, { desktopNotificationDelivered });

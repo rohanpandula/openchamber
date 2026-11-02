@@ -32,7 +32,7 @@ export function messageInfo(record, modelId) {
       if (part.type === 'text') return { type: 'text', text: part.text };
       if (part.type === 'reasoning') return { type: 'reasoning', text: part.text, time };
       const input = isRecord(part.state.input) ? part.state.input : {};
-      const content = [{ type: 'text', text: textOutput(part.state.output) }];
+      const content = part.state.exportContent || [{ type: 'text', text: textOutput(part.state.output) }];
       const state = part.state.status === 'completed'
         ? { status: 'completed', input, content }
         : part.state.status === 'error'
@@ -64,8 +64,12 @@ export function createEventBridge({ publish, modelId, onSessionUpdated = () => {
   });
   return ({ directory, payload }) => {
     const p = payload.properties || {};
-    const sessionID = p.sessionID || p.info?.sessionID || p.part?.sessionID || p.info?.id;
-    if (payload.type === 'session.updated') {
+    const sessionID = p.sessionID || p.info?.sessionID || p.part?.sessionID || p.form?.sessionID || p.info?.id;
+    if (payload.type === 'form.created') {
+      emit(directory, 'form.created', { form: p.form });
+    } else if (payload.type === 'form.replied' || payload.type === 'form.cancelled') {
+      emit(directory, payload.type, { sessionID, id: p.formID });
+    } else if (payload.type === 'session.updated') {
       onSessionUpdated(p.info);
       emit(directory, 'session.renamed', { sessionID: p.info.id, title: p.info.title });
     } else if (payload.type === 'session.status' && p.status.type === 'busy') {

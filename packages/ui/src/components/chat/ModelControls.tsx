@@ -41,6 +41,9 @@ import { useWidthMorph } from '@/lib/motion/useSizeMorph';
 import { agentLabel } from '@/lib/agentLabel';
 import { rankByQuery } from '@/lib/search/fuzzySearch';
 import { useContextStore } from '@/stores/contextStore';
+import { toast } from 'sonner';
+import { opencodeClient } from '@/lib/opencode/client';
+import { captureRuntimeInstance } from '@/lib/runtime-switch';
 import { useConfigStore, isStaleAutoSelection, selectConfigAgentsForDirectory, selectKnownAgent, selectKnownCatalogModel, selectProvidersForDirectory } from '@/stores/useConfigStore';
 import { filterVisibleAgents } from '@/stores/useAgentsStore';
 import { useSessionUIStore } from '@/sync/session-ui-store';
@@ -1579,12 +1582,46 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
         return null;
     }, [cycleAgentShortcut, selection]);
 
-    const handleProviderAndModelChange = (
+    const handoffPending = React.useRef(false);
+    const continueOnSelectedBackend = async (providerId: string, modelId: string, variant?: string | null) => {
+        const sourceId = selection ? controlledSessionId : currentSessionId;
+        if (!sourceId || providerId === 'deepseek-harness') return false;
+        if (handoffPending.current) return true;
+        const isCurrentRuntime = captureRuntimeInstance();
+        handoffPending.current = true;
+        try {
+            const source = await opencodeClient.getSession(sourceId, selection ? columnDirectory : currentSessionDirectory);
+            if (!isCurrentRuntime()) return true;
+            if (source.metadata?.openchamberBackend !== 'deepseek') return false;
+            if (selection) { toast.error('Open this chat in the main view to switch its backend.'); return true; }
+            const continued = await opencodeClient.continueWithOpenCode(sourceId, { providerID: providerId, id: modelId, variant }, currentSessionDirectory);
+            if (!isCurrentRuntime() || useSessionUIStore.getState().currentSessionId !== sourceId) return true;
+            await sync.syncSession(continued.id, true, continued.directory);
+            if (!isCurrentRuntime() || useSessionUIStore.getState().currentSessionId !== sourceId) return true;
+            saveSessionModelSelection(continued.id, providerId, modelId);
+            useSessionUIStore.getState().setCurrentSession(continued.id, continued.directory);
+            setProvider(providerId);
+            setModel(modelId);
+            setCurrentVariant(variant ?? undefined);
+            addRecentModel(providerId, modelId);
+            return true;
+        } catch (error) {
+            toast.error(error instanceof Error ? error.message : 'Could not switch conversation backend.');
+            return true;
+        } finally { handoffPending.current = false; }
+    };
+
+    const handleProviderAndModelChange = async (
         providerId: string,
         modelId: string,
         options?: { applyVariant?: boolean; variant?: string | undefined; agentName?: string | null },
     ) => {
         try {
+            if (await continueOnSelectedBackend(providerId, modelId, options?.applyVariant ? options.variant : resolveModelVariantSelection(providerId, modelId))) {
+                setAgentMenuOpen(false);
+                if (isCompact) closeMobilePanel();
+                return;
+            }
             const effectiveAgentName = options?.agentName ?? resolveLiveAgentName() ?? undefined;
             // `applyVariant` is only set when the user adjusted the effort in
             // the model picker, so no effort means an explicit "Default".
@@ -1917,7 +1954,12 @@ export const ModelControls: React.FC<ModelControlsProps> = ({
 
     // Chosen in the phone's model sheet: the row runs with the effort it would
     // show, and no effort there means "Default".
-    const handleMobileModelApply = (providerId: string, modelId: string) => {
+    const handleMobileModelApply = async (providerId: string, modelId: string) => {
+        if (await continueOnSelectedBackend(providerId, modelId, resolveModelVariantSelection(providerId, modelId))) {
+            setMobileDetailsEntry(null);
+            closeMobilePanel();
+            return;
+        }
         const result = selection
             ? applyModelSelectionWithVariant(providerId, modelId, resolveModelVariantSelection(providerId, modelId) ?? null)
             : tryApplyModelSelection(providerId, modelId);

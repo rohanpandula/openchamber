@@ -42,7 +42,7 @@ The shared-host connection uses the same running Harness sessions as its desktop
 
 Download the Apple Silicon macOS package from [this fork's Releases page](https://github.com/rohanpandula/openchamber/releases/latest), open the DMG, and drag **OpenChamber DSH** into Applications. Configure Harness using the [DeepSeek setup](#configure-deepseek), then open the app and select **DeepSeek Harness** in the model picker.
 
-The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.9**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
+The package is signed with the maintainer's Developer ID. Apple notarization is not included in this release, so macOS may block a downloaded copy. The current fork release is **2.5.10**, based on upstream OpenChamber **2.5.3**. Official OpenChamber packages do not include this integration.
 
 ### Build from source
 
@@ -165,7 +165,9 @@ Open the Vite URL printed by the command. The server runs on your machine; the b
 | Text chat and streamed responses | Supported |
 | Reasoning and tool output | Supported when emitted by Harness |
 | Cancellation | Supported |
-| Tool permissions and interactive questions | Answer in Harness for shared-host chats; ACP permissions work in OpenChamber |
+| Interactive questions | Choose options or type an answer in OpenChamber; answers sync back to Harness |
+| Tool permissions | Answer in Harness for shared-host chats; ACP permissions work in OpenChamber |
+| Switch to an OpenCode model | Continues with imported history in OpenCode; keeps the Harness original |
 | Saved conversations and restart recovery | Supported |
 | Two-way Harness desktop sync | Shared-host setup required |
 | Subagents | Kept inside their parent chat |
@@ -267,3 +269,28 @@ Keep fixes focused and include a reproduction or test for changed behavior. Read
 Maintained as a fork by [Rohan Pandula](https://github.com/rohanpandula). OpenChamber DSH builds on the work of the [OpenChamber contributors](https://github.com/openchamber/openchamber/graphs/contributors), [OpenCode](https://opencode.ai), and DeepSeek Harness. OpenChamber is independent of the OpenCode and DeepSeek teams.
 
 [MIT license](LICENSE).
+
+
+## Questions, model switching and phone notifications
+
+When Harness asks a question, OpenChamber shows its choices above the composer.
+Choose an option or enter your own answer, then Submit. The same Harness chat
+continues; answering in either app dismisses the other app's pending question.
+
+To use a model from OpenCode, finish the current turn and choose the model in the
+main chat's model picker. OpenChamber imports the conversation into an OpenCode
+continuation and opens it. The Harness original stays intact. Text, tool history
+and images transfer; an unsupported file attachment stops the switch rather than
+silently dropping it. OpenCode stores user text and images separately, so inline
+image positions are normalized during import. New messages in the continuation run in OpenCode and do not
+sync back into the original Harness chat.
+
+The native phone app bundles its UI. The new model-switching control requires
+a native build containing this fork; updating the Mac server alone does not
+replace an App Store or TestFlight app. The hosted mobile page gets the control
+with the server update. Question forms and push use the existing native UI.
+
+In the native phone app, enable **Settings → Notifications → Enable notifications**
+and allow the OS permission. The phone receives completion and question alerts
+when no desktop or web client is visible. Keep OpenChamber and Harness running on
+the Mac. A tunnel provides access; it does not keep a sleeping Mac online.

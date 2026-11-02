@@ -209,3 +209,12 @@ The control stream retains its browser-control capability declaration, runtime
 switch cleanup, stale-source rejection, heartbeat, and reconnect-ready events.
 Electron uses its native notification path; VS Code does not subscribe to this
 server-only stream. Mobile shells retain their existing push behavior.
+
+
+### Desktop focus and phone delivery
+
+The Electron focus check gates local desktop alerts only. Phone delivery uses
+the interactive-client visibility check, so stale focus state cannot suppress
+an away-from-Mac notification. A visible desktop/web client still suppresses
+native phone push. Harness questions use the same form-created trigger as
+OpenCode questions.

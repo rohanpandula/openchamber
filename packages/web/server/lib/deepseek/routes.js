@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
+import { Identifier } from '@opencode/schema/identifier';
 import { isSessionNotFoundError } from '@opencode/client';
 import { createOpenCodeClient } from '../openchamber-sessions/opencode-client.js';
 import { createProjectIdFromPath } from '../projects/project-id.js';
@@ -123,7 +124,7 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
     try { await handler(req, res, next); }
     catch (error) {
       if (res.headersSent) return next(error);
-      res.status(error instanceof z.ZodError ? 400 : error.code === 'SESSION_BUSY' ? 409 : error.code === 'HOST_UNAVAILABLE' ? 503 : 500).json({ error: error.message });
+      res.status(error instanceof z.ZodError ? 400 : error.code === 'FORM_NOT_FOUND' ? 404 : error.code === 'SESSION_BUSY' ? 409 : error.code === 'HOST_UNAVAILABLE' ? 503 : 500).json({ error: error.message });
     }
   };
   const nativeSession = async (id) => client().session.get({ sessionID: id });
@@ -167,6 +168,12 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
       const snapshot = await runtime.getStatusSnapshot();
       for (const id of snapshot.busySessions) active[id] = { type: 'running' };
       res.json({ data: active });
+    }));
+    app.get('/api/form', guard(async (req, res, next) => {
+      if (!enabled() || !shared) return next();
+      const directory = directoryOf(req);
+      const result = await client(directory).form.list();
+      res.json({ ...result, data: [...result.data, ...await shared.listPendingForms(directory)] });
     }));
     app.get('/api/permission/request', guard(async (req, res, next) => {
       if (!enabled()) return next();
@@ -219,6 +226,28 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
         const request = requests.find((entry) => entry.id === suffix.split('/')[2]);
         return request ? res.json({ data: permissionInfo(request) }) : res.status(404).json({ error: 'Permission is no longer pending' });
       }
+      if (req.method === 'POST' && suffix === '/backend') {
+        if (!canRun(res)) return;
+        const input = z.object({ id: z.string().startsWith('ses_'), model: z.object({ providerID: z.string().min(1), id: z.string().min(1), variant: z.string().optional() }) }).parse(req.body);
+        if (input.model.providerID === PROVIDER_ID) return res.status(400).json({ error: 'Choose an OpenCode model for this continuation.' });
+        if ((await runtime.getStatusSnapshot()).busySessions.includes(id)) return res.status(409).json({ error: 'Wait for the current Harness reply to finish before switching backends.' });
+        let existing;
+        try { existing = await nativeSession(input.id); } catch (error) { if (!isSessionNotFoundError(error)) throw error; }
+        if (existing) {
+          if (existing.metadata?.openchamberHandoffFrom !== id || existing.model?.providerID !== input.model.providerID || existing.model?.id !== input.model.id) return res.status(409).json({ error: 'Continuation ID already belongs to another chat.' });
+          return res.json({ id: existing.id });
+        }
+        const native = await nativeSession(id);
+        const records = shared?.owns(id) ? await shared.getExportMessages({ sessionID: id }) : await runtime.getMessages({ sessionID: id });
+        records.sort((a, b) => a.info.time.created - b.info.time.created);
+        // Imported messages need globally unique IDs ordered before the next OpenCode reply.
+        const messages = records.map((record) => ({ ...messageInfo(record, modelId), id: `msg_${Identifier.ascending()}` }));
+        const continuation = await client(session.directory).experimental.session.import({
+          info: { ...native, id: input.id, location: { ...native.location, directory: session.directory }, model: input.model, metadata: { ...native.metadata, openchamberBackend: 'opencode', openchamberHandoffFrom: id } },
+          messages,
+        });
+        return res.json({ id: continuation.id });
+      }
       if (req.method === 'POST' && suffix === '/prompt') {
         if (!canRun(res)) return;
         const input = promptSchema.parse(req.body);
@@ -233,6 +262,12 @@ export function createDeepSeekIntegration({ dataDir, buildOpenCodeUrl, getOpenCo
       }
       if (req.method === 'POST' && suffix === '/interrupt') {
         await runtime.abortSession({ sessionID: id }); return res.status(204).end();
+      }
+      const formAction = /^\/form\/(form_dsh_[^/]+)\/(reply|cancel)$/.exec(suffix);
+      if (req.method === 'POST' && formAction && shared) {
+        if (!canRun(res)) return;
+        await shared.answerForm(id, formAction[1], req.body?.answer ?? {}, formAction[2] === 'cancel');
+        return res.status(204).end();
       }
       if (req.method === 'POST' && suffix === '/model') {
         if (!canRun(res)) return;
